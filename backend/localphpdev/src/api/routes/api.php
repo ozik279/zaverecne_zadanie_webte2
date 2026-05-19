@@ -18,5 +18,9 @@ Route::middleware(RequireApiKey::class)->group(function (): void {
     // Clovek B:
     // - /simulations/*  vypocty animacii
     // - /statistics*    statistiky pouzitia animacii
+    Route::post('/simulations/inverted-pendulum', [\App\Http\Controllers\SimulationController::class, 'invertedPendulum']);
+    Route::post('/simulations/ball-beam', [\App\Http\Controllers\SimulationController::class, 'ballBeam']);
+    Route::get('/statistics', [\App\Http\Controllers\StatisticsController::class, 'index']);
+    Route::get('/statistics/{simulation}', [\App\Http\Controllers\StatisticsController::class, 'show']);
 });
 
