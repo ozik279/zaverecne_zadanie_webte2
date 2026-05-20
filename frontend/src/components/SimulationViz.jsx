@@ -16,7 +16,7 @@ export default function SimulationViz({ simulation, frames, time, series = [], t
 
     const delay = Math.max(40, Number(playbackDelayMs) || 80)
     const timer = window.setInterval(() => {
-      setIndex((current) => (current >= frames.length - 1 ? 0 : current + 1))
+      setIndex((current) => (current >= frames.length - 1 ? current : current + 1))
     }, delay)
 
     return () => window.clearInterval(timer)
@@ -134,43 +134,58 @@ function InvertedPendulumScene({ frame }) {
 
 function BallBeamScene({ frame, frames, index }) {
   const reference = finiteNumber(frame?.reference, 0.25)
-  const position = getBallPosition(frame)
+  const position = getSmoothedFrameValue(frames, index, getBallPosition, getBallPosition(frame))
 
   const pivotX = 560
   const pivotY = 145
   const beamLength = 430
   const ballRadius = 20
-  const positionScale = 520
 
-  // Keep the animation coupled to the same raw beam angle that is plotted in the graph.
-  const modelAngle = getVisualBeamAngle(frame)
+  // CTMS diagram: the beam is attached on the right side to the lever/gear.
+  // Ball coordinate r is drawn from the right side of the beam toward the ball.
+  // Therefore r = 0 starts near the right pivot and larger r moves left along the beam.
+  const maxCoordinate = Math.max(1.0, reference, ...frames.map(getBallPosition).filter(Number.isFinite))
+  const coordinateToPx = (value) => clamp(value / maxCoordinate, 0, 1) * (beamLength - ballRadius * 2 - 12)
+
+  // x(:,3) from the Octave model is the beam angle alpha. It is physically very small,
+  // so it is visually amplified but still clamped and smoothed to avoid artificial jumps.
+  const rawAngle = getSmoothedFrameValue(frames, index, getRawBeamAngle, getRawBeamAngle(frame))
+  const modelAngle = clamp(-rawAngle * 35, -0.16, 0.16)
+
   const beamDirX = -Math.cos(modelAngle)
-  const beamDirY = Math.sin(modelAngle)
+  const beamDirY = -Math.sin(modelAngle)
   const beamPerpX = Math.sin(modelAngle)
   const beamPerpY = -Math.cos(modelAngle)
 
-  const ballDistance = clamp(position * positionScale, ballRadius + 10, beamLength - ballRadius - 12)
-  const referenceDistance = clamp(reference * positionScale, ballRadius + 10, beamLength - ballRadius - 12)
+  const ballDistanceFromPivot = coordinateToPx(position) + ballRadius + 8
+  const referenceDistanceFromPivot = coordinateToPx(reference) + ballRadius + 8
 
-  const beamStartX = pivotX + beamDirX * beamLength
-  const beamStartY = pivotY + beamDirY * beamLength
-  const ballCenterX = beamStartX - beamDirX * ballDistance + beamPerpX * (ballRadius + 7)
-  const ballCenterY = beamStartY - beamDirY * ballDistance + beamPerpY * (ballRadius + 7)
-  const referenceX = beamStartX - beamDirX * referenceDistance
-  const referenceY = beamStartY - beamDirY * referenceDistance
+  const beamEndX = pivotX + beamDirX * beamLength
+  const beamEndY = pivotY + beamDirY * beamLength
+
+  const ballCenterX = pivotX + beamDirX * ballDistanceFromPivot + beamPerpX * (ballRadius + 8)
+  const ballCenterY = pivotY + beamDirY * ballDistanceFromPivot + beamPerpY * (ballRadius + 8)
+
+  const referenceX = pivotX + beamDirX * referenceDistanceFromPivot
+  const referenceY = pivotY + beamDirY * referenceDistanceFromPivot
+
   const gearCenterX = pivotX
   const gearCenterY = 246
 
   return (
     <g>
       <line x1="110" y1="248" x2="705" y2="248" stroke="#94a3b8" strokeWidth="4" />
+
       <circle cx={gearCenterX} cy={gearCenterY} r="58" fill="#8b5e34" stroke="#4b2f17" strokeWidth="6" />
       <circle cx={gearCenterX} cy={gearCenterY} r="14" fill="#d6a57b" stroke="#4b2f17" strokeWidth="3" />
-      <line x1={pivotX} y1={pivotY} x2={gearCenterX} y2={gearCenterY - 58} stroke="#d4af37" strokeWidth="8" strokeLinecap="round" />
-      <line x1={gearCenterX} y1={gearCenterY} x2={gearCenterX + 48} y2={gearCenterY - 24} stroke="#4b2f17" strokeWidth="4" strokeLinecap="round" />
-      <circle cx={gearCenterX + 48} cy={gearCenterY - 24} r="8" fill="#c48d4d" />
+      <line x1={gearCenterX} y1={gearCenterY} x2={gearCenterX + 50} y2={gearCenterY - 25} stroke="#4b2f17" strokeWidth="5" strokeLinecap="round" />
+      <circle cx={gearCenterX + 50} cy={gearCenterY - 25} r="8" fill="#c48d4d" />
 
-      <line x1={beamStartX} y1={beamStartY} x2={pivotX} y2={pivotY} stroke="#cbd5e1" strokeWidth="14" strokeLinecap="round" />
+      <line x1={pivotX} y1={pivotY} x2={gearCenterX} y2={gearCenterY - 58} stroke="#d4af37" strokeWidth="8" strokeLinecap="round" />
+      <circle cx={pivotX} cy={pivotY} r="10" fill="#f59e0b" />
+
+      <line x1={beamEndX} y1={beamEndY} x2={pivotX} y2={pivotY} stroke="#cbd5e1" strokeWidth="16" strokeLinecap="round" />
+      <line x1={beamEndX} y1={beamEndY + 10} x2={pivotX} y2={pivotY + 10} stroke="#64748b" strokeWidth="5" strokeLinecap="round" />
 
       <line
         x1={referenceX}
@@ -190,13 +205,7 @@ function BallBeamScene({ frame, frames, index }) {
         stroke="#1d4ed8"
         strokeWidth="4"
       />
-
-      <circle
-        cx={ballCenterX - 6}
-        cy={ballCenterY - 6}
-        r="5"
-        fill="#dbeafe"
-      />
+      <circle cx={ballCenterX - 6} cy={ballCenterY - 6} r="5" fill="#dbeafe" />
 
       <line x1="110" y1="248" x2={gearCenterX} y2="248" stroke="#7c8ca6" strokeWidth="2" strokeDasharray="4 8" />
     </g>
@@ -229,6 +238,30 @@ function getRawBeamAngle(frame) {
 
 function getVisualBeamAngle(frame) {
   return getRawBeamAngle(frame)
+}
+
+function getSmoothedFrameValue(frames, index, getter, fallback = 0) {
+  if (!Array.isArray(frames) || frames.length === 0) {
+    return finiteNumber(fallback, 0)
+  }
+
+  const currentIndex = clamp(Math.round(Number(index) || 0), 0, frames.length - 1)
+  const weights = [1, 2, 4, 2, 1]
+  const offsets = [-2, -1, 0, 1, 2]
+  let total = 0
+  let weightTotal = 0
+
+  offsets.forEach((offset, i) => {
+    const frameIndex = clamp(currentIndex + offset, 0, frames.length - 1)
+    const value = finiteNumber(getter(frames[frameIndex]), NaN)
+
+    if (Number.isFinite(value)) {
+      total += value * weights[i]
+      weightTotal += weights[i]
+    }
+  })
+
+  return weightTotal > 0 ? total / weightTotal : finiteNumber(fallback, 0)
 }
 
 function labelForSeries(name, languageStrings) {
