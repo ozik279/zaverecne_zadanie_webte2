@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CasConsoleController;
 use App\Http\Controllers\CasLogController;
+use App\Http\Controllers\OpenApiController;
 use App\Http\Middleware\RequireApiKey;
 use Illuminate\Support\Facades\Route;
 
@@ -14,6 +15,8 @@ Route::middleware(RequireApiKey::class)->group(function (): void {
     Route::post('/cas/reset', [CasConsoleController::class, 'reset']);
     Route::get('/logs', [CasLogController::class, 'index']);
     Route::get('/logs/export.csv', [CasLogController::class, 'exportCsv']);
+    Route::get('/openapi.json', [OpenApiController::class, 'json']);
+    Route::get('/openapi.pdf', [OpenApiController::class, 'pdf']);
 
     // Clovek B:
     // - /simulations/*  vypocty animacii
@@ -23,4 +26,3 @@ Route::middleware(RequireApiKey::class)->group(function (): void {
     Route::get('/statistics', [\App\Http\Controllers\StatisticsController::class, 'index']);
     Route::get('/statistics/{simulation}', [\App\Http\Controllers\StatisticsController::class, 'show']);
 });
-
