@@ -148,9 +148,11 @@ initialPosition = $initialPosition;
 initialAngle = $initialAngle;
 [y,t,x] = lsim(sys,r*ones(size(t)),t,[initialPosition;0;initialAngle;0]);
 
+printf('__SIM_BEGIN__\n');
 printf('TIME=%s\n', mat2str(t, 12));
 printf('SERIES=cart_position:%s|pendulum_angle:%s\n', mat2str(y(:,1), 12), mat2str(y(:,2), 12));
 printf('STATE=position:%s|velocity:%s|angle:%s|angular_velocity:%s\n', mat2str(x(:,1), 12), mat2str(x(:,2), 12), mat2str(x(:,3), 12), mat2str(x(:,4), 12));
+printf('__SIM_END__\n');
 OCTAVE;
     }
 
@@ -189,9 +191,11 @@ initialSpeed = $initialSpeed;
 initialAcceleration = $initialAcceleration;
 [y,t,x] = lsim(N*sys,r*ones(size(t)),t,[initialSpeed;0;initialAcceleration;0]);
 
+printf('__SIM_BEGIN__\n');
 printf('TIME=%s\n', mat2str(t, 12));
 printf('SERIES=ball_position:%s\n', mat2str(y(:,1), 12));
 printf('STATE=state_1:%s|state_2:%s|state_3:%s|state_4:%s\n', mat2str(x(:,1), 12), mat2str(x(:,2), 12), mat2str(x(:,3), 12), mat2str(x(:,4), 12));
+printf('__SIM_END__\n');
 OCTAVE;
     }
 
