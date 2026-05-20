@@ -25,6 +25,8 @@ class SimulationController extends Controller
     {
         $validated = $request->validate($this->baseRules([
             'reference' => ['required', 'numeric'],
+            'initialPosition' => ['nullable', 'numeric'],
+            'initialAngle' => ['nullable', 'numeric'],
             'initialSpeed' => ['nullable', 'numeric'],
             'initialAcceleration' => ['nullable', 'numeric'],
         ]));

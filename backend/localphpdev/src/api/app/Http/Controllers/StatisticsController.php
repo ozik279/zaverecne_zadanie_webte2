@@ -22,7 +22,32 @@ class StatisticsController extends Controller
         abort_unless(in_array($simulation, self::SIMULATIONS, true), 404);
 
         return response()->json([
-            'data' => $this->summaryFor($simulation),
+            'data' => array_merge($this->summaryFor($simulation), [
+                'recentUsages' => AnimationUsage::query()
+                    ->where('simulation', $simulation)
+                    ->latest('created_at')
+                    ->limit(50)
+                    ->get()
+                    ->map(fn (AnimationUsage $usage): array => [
+                        'createdAt' => optional($usage->created_at)->toISOString(),
+                        'city' => $usage->city ?: 'Unknown',
+                        'country' => $usage->country ?: 'Unknown',
+                    ])
+                    ->values(),
+                'recentRuns' => SimulationRun::query()
+                    ->where('simulation', $simulation)
+                    ->latest('created_at')
+                    ->limit(50)
+                    ->get()
+                    ->map(fn (SimulationRun $run): array => [
+                        'createdAt' => optional($run->created_at)->toISOString(),
+                        'successful' => (bool) $run->successful,
+                        'durationMs' => $run->duration_ms,
+                        'city' => $run->city ?: 'Unknown',
+                        'country' => $run->country ?: 'Unknown',
+                    ])
+                    ->values(),
+            ]),
         ]);
     }
 

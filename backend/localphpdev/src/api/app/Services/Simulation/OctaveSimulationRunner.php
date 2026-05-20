@@ -70,6 +70,8 @@ class OctaveSimulationRunner
             $series = $this->parseSeriesLine($parsed['SERIES'] ?? '');
             $state = $this->parseSeriesLine($parsed['STATE'] ?? '');
 
+            $this->applySlowdown((int) ($parameters['slowdownMs'] ?? config('simulations.slowdown_ms', 0)), count($time));
+
             return [
                 'successful' => true,
                 'simulation' => $simulation,
@@ -120,39 +122,25 @@ class OctaveSimulationRunner
         $initialAngle = $this->floatValue($parameters['initialAngle'] ?? 0.0);
         $duration = $this->floatValue($parameters['duration'] ?? 10.0);
         $step = $this->floatValue($parameters['step'] ?? 0.05);
+        $baseScript = $this->loadModelScript('kyvadlo.txt');
+        $modelScript = $this->stripDemoSimulation($baseScript);
 
         return <<<OCTAVE
-more off;
 pkg load control;
 
-M = 0.5;
-m = 0.2;
-b = 0.1;
-I = 0.006;
-g = 9.8;
-l = 0.3;
-p = I*(M+m)+M*m*l^2;
-A = [0 1 0 0; 0 -(I+m*l^2)*b/p (m^2*g*l^2)/p 0; 0 0 0 1; 0 -(m*l*b)/p m*g*l*(M+m)/p 0];
-B = [0; (I+m*l^2)/p; 0; m*l/p];
-C = [1 0 0 0; 0 0 1 0];
-D = [0; 0];
-K = lqr(A,B,C'*C,1);
-Ac = (A-B*K);
-N = -inv(C(1,:)*inv(A-B*K)*B);
+{$modelScript}
 
-sys = ss(Ac,B*N,C,D);
+    t = 0:$step:$duration;
+    r = $reference;
+    initPozicia = $initialPosition;
+    initUhol = $initialAngle;
+    [y,t,x] = lsim(sys,r*ones(size(t)),t,[initPozicia;0;initUhol;0]);
 
-t = 0:$step:$duration;
-r = $reference;
-initialPosition = $initialPosition;
-initialAngle = $initialAngle;
-[y,t,x] = lsim(sys,r*ones(size(t)),t,[initialPosition;0;initialAngle;0]);
-
-printf('__SIM_BEGIN__\n');
-printf('TIME=%s\n', mat2str(t, 12));
-printf('SERIES=cart_position:%s|pendulum_angle:%s\n', mat2str(y(:,1), 12), mat2str(y(:,2), 12));
-printf('STATE=position:%s|velocity:%s|angle:%s|angular_velocity:%s\n', mat2str(x(:,1), 12), mat2str(x(:,2), 12), mat2str(x(:,3), 12), mat2str(x(:,4), 12));
-printf('__SIM_END__\n');
+printf('__SIM_BEGIN__\\n');
+printf('TIME=%s\\n', mat2str(t, 12));
+printf('SERIES=cart_position:%s|pendulum_angle:%s\\n', mat2str(y(:,1), 12), mat2str(y(:,2), 12));
+printf('STATE=position:%s|velocity:%s|angle:%s|angular_velocity:%s\\n', mat2str(x(:,1), 12), mat2str(x(:,2), 12), mat2str(x(:,3), 12), mat2str(x(:,4), 12));
+printf('__SIM_END__\\n');
 OCTAVE;
     }
 
@@ -162,41 +150,88 @@ OCTAVE;
     private function buildBallBeamScript(array $parameters): string
     {
         $reference = $this->floatValue($parameters['reference'] ?? 0.25);
-        $initialSpeed = $this->floatValue($parameters['initialSpeed'] ?? 0.0);
-        $initialAcceleration = $this->floatValue($parameters['initialAcceleration'] ?? 0.0);
+        $initialPosition = $this->floatValue($parameters['initialPosition'] ?? ($parameters['initialSpeed'] ?? 0.0));
+        $initialAngle = $this->floatValue($parameters['initialAngle'] ?? ($parameters['initialAcceleration'] ?? 0.0));
         $duration = $this->floatValue($parameters['duration'] ?? 5.0);
         $step = $this->floatValue($parameters['step'] ?? 0.01);
+        $baseScript = $this->loadModelScript('gulicka.txt');
+        $modelScript = $this->stripDemoSimulation($baseScript);
 
         return <<<OCTAVE
-more off;
-pkg load control;
+    pkg load control;
 
-m = 0.111;
-R = 0.015;
-g = -9.8;
-J = 9.99e-6;
-H = -m*g/(J/(R^2)+m);
-A = [0 1 0 0; 0 0 H 0; 0 0 0 1; 0 0 0 0];
-B = [0;0;0;1];
-C = [1 0 0 0];
-D = [0];
-K = place(A,B,[-2+2i,-2-2i,-20,-80]);
-N = -inv(C*inv(A-B*K)*B);
-
-sys = ss(A-B*K,B,C,D);
+    {$modelScript}
 
 t = 0:$step:$duration;
 r = $reference;
-initialSpeed = $initialSpeed;
-initialAcceleration = $initialAcceleration;
-[y,t,x] = lsim(N*sys,r*ones(size(t)),t,[initialSpeed;0;initialAcceleration;0]);
+initPoloha = $initialPosition;
+initUhol = $initialAngle;
+[y,t,x] = lsim(N*sys,r*ones(size(t)),t,[initPoloha;0;initUhol;0]);
 
-printf('__SIM_BEGIN__\n');
-printf('TIME=%s\n', mat2str(t, 12));
-printf('SERIES=ball_position:%s\n', mat2str(y(:,1), 12));
-printf('STATE=state_1:%s|state_2:%s|state_3:%s|state_4:%s\n', mat2str(x(:,1), 12), mat2str(x(:,2), 12), mat2str(x(:,3), 12), mat2str(x(:,4), 12));
-printf('__SIM_END__\n');
+printf('__SIM_BEGIN__\\n');
+printf('TIME=%s\\n', mat2str(t, 12));
+printf('SERIES=ball_position:%s|beam_angle:%s\\n', mat2str(y(:,1), 12), mat2str(x(:,3), 12));
+printf('STATE=state_1:%s|state_2:%s|state_3:%s|state_4:%s\\n', mat2str(x(:,1), 12), mat2str(x(:,2), 12), mat2str(x(:,3), 12), mat2str(x(:,4), 12));
+printf('__SIM_END__\\n');
 OCTAVE;
+    }
+
+    private function loadModelScript(string $fileName): string
+    {
+        $candidates = [
+            base_path('../other/'.$fileName),
+            base_path('../../other/'.$fileName),
+            base_path('../../../other/'.$fileName),
+            base_path('../../../../other/'.$fileName),
+        ];
+
+        $scriptPath = null;
+        foreach ($candidates as $candidate) {
+            if (File::exists($candidate)) {
+                $scriptPath = $candidate;
+                break;
+            }
+        }
+
+        if (! is_string($scriptPath)) {
+            throw new \RuntimeException("Simulation model script not found: {$fileName}");
+        }
+
+        return trim((string) File::get($scriptPath));
+    }
+
+    private function stripDemoSimulation(string $script): string
+    {
+        $lines = preg_split('/\R/', $script) ?: [];
+        $keptLines = [];
+
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*t\s*=\s*0\s*:\s*/', $line)) {
+                break;
+            }
+
+            if (preg_match('/^\s*\[y\s*,\s*t\s*,\s*x\s*\]\s*=/', $line)) {
+                break;
+            }
+
+            if (preg_match('/^\s*plot\s*\(/', $line)) {
+                break;
+            }
+
+            $keptLines[] = $line;
+        }
+
+        return trim(implode("\n", $keptLines));
+    }
+
+    private function applySlowdown(int $slowdownMs, int $frameCount): void
+    {
+        if ($slowdownMs <= 0 || $frameCount <= 0) {
+            return;
+        }
+
+        $effectiveFrames = max(1, min($frameCount, 20));
+        usleep($slowdownMs * 1000 * $effectiveFrames);
     }
 
     /**
@@ -320,6 +355,14 @@ OCTAVE;
                 $frame['cartX'] = $cartPosition;
                 $frame['pendulumTipX'] = $cartPosition + $lengthValue * sin($angle);
                 $frame['pendulumTipY'] = -$lengthValue * cos($angle);
+            }
+
+            if ($simulation === 'ball-beam') {
+                $ballPosition = (float) ($frame['ball_position'] ?? ($frame['position'] ?? ($frame['state_1'] ?? 0.0)));
+                $beamAngle = (float) ($frame['beam_angle'] ?? ($frame['angle'] ?? ($frame['state_3'] ?? 0.0)));
+
+                $frame['ballPosition'] = $ballPosition;
+                $frame['beamAngle'] = $beamAngle;
             }
 
             $frames[] = $frame;
