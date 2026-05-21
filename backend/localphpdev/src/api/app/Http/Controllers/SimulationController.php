@@ -64,10 +64,12 @@ class SimulationController extends Controller
     {
         return array_merge([
             'clientToken' => ['nullable', 'string', 'max:128'],
+            'browserLatitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'browserLongitude' => ['nullable', 'numeric', 'between:-180,180'],
             'reference' => ['nullable', 'numeric'],
             'duration' => ['nullable', 'numeric', 'gt:0', 'max:120'],
             'step' => ['nullable', 'numeric', 'gt:0', 'max:1'],
-            'slowdownMs' => ['nullable', 'integer', 'min:0', 'max:5000'],
+            'slowdownMs' => ['nullable', 'integer', 'min:0', 'max:1000'],
         ], $extraRules);
     }
 
@@ -78,7 +80,11 @@ class SimulationController extends Controller
     {
         $clientToken = $this->resolveClientToken($request, $validated);
         $ipAddress = $this->resolveClientIp($request);
-        $location = $this->ipLocationResolver->resolve($ipAddress);
+        $location = $this->ipLocationResolver->resolve(
+            $ipAddress,
+            $validated['browserLatitude'] ?? null,
+            $validated['browserLongitude'] ?? null,
+        );
 
         SimulationRun::query()->create([
             'simulation' => (string) ($result['simulation'] ?? 'unknown'),

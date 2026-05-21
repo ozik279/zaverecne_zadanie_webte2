@@ -6,7 +6,6 @@ export default function SimulationPage({ title, simulation, simulationKey, endpo
   const [form, setForm] = useState(initialForm)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
-  const [fieldErrors, setFieldErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [playing, setPlaying] = useState(true)
   const [resultVersion, setResultVersion] = useState(0)
@@ -14,19 +13,8 @@ export default function SimulationPage({ title, simulation, simulationKey, endpo
 
   async function handleSubmit(event) {
     event.preventDefault()
-
-    const validationErrors = validateForm(form, fieldConstraints, languageStrings, simulationKey)
-
-    if (Object.keys(validationErrors).length > 0) {
-      setFieldErrors(validationErrors)
-      setError(languageStrings.validationSummary)
-      setPlaying(false)
-      return
-    }
-
     setLoading(true)
     setError('')
-    setFieldErrors({})
 
     try {
       const browserLocation = await getBrowserLocation()
@@ -58,31 +46,11 @@ export default function SimulationPage({ title, simulation, simulationKey, endpo
       ...current,
       [name]: value,
     }))
-
-    setFieldErrors((current) => {
-      if (!current[name]) {
-        return current
-      }
-
-      const nextError = validateField(name, value, fieldConstraints[name] || {}, languageStrings, simulationKey)
-      const nextErrors = { ...current }
-
-      if (nextError) {
-        nextErrors[name] = nextError
-      } else {
-        delete nextErrors[name]
-      }
-
-      return nextErrors
-    })
-
     setPlaying(false)
   }
 
   function resetForm() {
     setForm(initialForm)
-    setFieldErrors({})
-    setError('')
     setPlaying(false)
   }
 
@@ -96,7 +64,7 @@ export default function SimulationPage({ title, simulation, simulationKey, endpo
       </section>
 
       <section className="panel-grid simulation-grid">
-        <form className="card form-card tool-card" onSubmit={handleSubmit} noValidate>
+        <form className="card form-card tool-card" onSubmit={handleSubmit}>
           <div className="section-head">
             <h2>{languageStrings.requestPayload}</h2>
           </div>
@@ -104,10 +72,9 @@ export default function SimulationPage({ title, simulation, simulationKey, endpo
           <div className="form-grid">
             {Object.entries(form).map(([name, value]) => {
               const constraints = fieldConstraints[name] || {}
-              const fieldError = fieldErrors[name]
 
               return (
-                <label key={name} className={`field ${fieldError ? 'field-has-error' : ''}`}>
+                <label key={name} className="field">
                   <span>{labelFor(name, languageStrings, simulationKey)}</span>
                   <input
                     type="number"
@@ -115,17 +82,8 @@ export default function SimulationPage({ title, simulation, simulationKey, endpo
                     max={constraints.max}
                     step={constraints.inputStep ?? 'any'}
                     value={value}
-                    required
-                    aria-invalid={fieldError ? 'true' : 'false'}
-                    aria-describedby={fieldError ? `${name}-error` : undefined}
-                    onInvalid={(event) => event.preventDefault()}
                     onChange={(event) => updateField(name, event.target.value)}
                   />
-                  {fieldError ? (
-                    <small id={`${name}-error`} className="field-error-message">
-                      {fieldError}
-                    </small>
-                  ) : null}
                   {hasRange(constraints) ? (
                     <small className="field-range">
                       {formatRange(constraints, languageStrings)}
@@ -219,52 +177,6 @@ function formatRange(constraints, languageStrings) {
   const template = languageStrings.fieldRange || 'Range: {min} - {max}'
 
   return template.replace('{min}', min).replace('{max}', max)
-}
-
-
-function validateForm(form, constraintsByField, languageStrings, simulationKey) {
-  return Object.entries(form).reduce((errors, [name, value]) => {
-    const error = validateField(name, value, constraintsByField[name] || {}, languageStrings, simulationKey)
-
-    if (error) {
-      errors[name] = error
-    }
-
-    return errors
-  }, {})
-}
-
-function validateField(name, value, constraints, languageStrings, simulationKey) {
-  const label = labelFor(name, languageStrings, simulationKey)
-  const rawValue = String(value ?? '').trim()
-  const validation = languageStrings.validation || {}
-
-  if (rawValue === '') {
-    return formatValidationMessage(validation.required, { field: label })
-  }
-
-  const numericValue = Number(rawValue)
-
-  if (!Number.isFinite(numericValue)) {
-    return formatValidationMessage(validation.number, { field: label })
-  }
-
-  if (constraints.min !== undefined && numericValue < Number(constraints.min)) {
-    return formatValidationMessage(validation.min, { field: label, min: constraints.min })
-  }
-
-  if (constraints.max !== undefined && numericValue > Number(constraints.max)) {
-    return formatValidationMessage(validation.max, { field: label, max: constraints.max })
-  }
-
-  return ''
-}
-
-function formatValidationMessage(template, values) {
-  return Object.entries(values).reduce(
-    (message, [key, value]) => message.replaceAll(`{${key}}`, value),
-    template || '',
-  )
 }
 
 function getBrowserLocation() {

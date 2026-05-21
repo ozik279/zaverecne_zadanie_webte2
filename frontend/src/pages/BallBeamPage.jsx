@@ -28,7 +28,7 @@ export default function BallBeamPage({ language }) {
         initialBeamAngularVelocity: { min: -2, max: 2 },
         duration: { min: 0.1, max: 5, inputStep: 0.1 },
         step: { min: 0.005, max: 0.05, inputStep: 0.001 },
-        slowdownMs: { min: 0, max: 5000, inputStep: 1 },
+        slowdownMs: { min: 0, max: 1000, inputStep: 1 },
       }}
       languageStrings={t}
     />

@@ -336,43 +336,6 @@ button, input, select {
   box-shadow: 0 0 0 3px rgba(142, 202, 230, 0.12);
 }
 
-.field-has-error input,
-.field-has-error select,
-.field-has-error .syntax-editor {
-  border-color: rgba(251, 113, 133, 0.72);
-  box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.12);
-}
-
-.field-error-message {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: fit-content;
-  max-width: 100%;
-  border: 1px solid rgba(251, 113, 133, 0.24);
-  border-radius: 12px;
-  background: rgba(127, 29, 29, 0.22);
-  color: #fecdd3;
-  padding: 8px 10px;
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-
-.field-error-message::before {
-  content: '!';
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  background: rgba(251, 113, 133, 0.18);
-  color: #fecdd3;
-  font-size: 0.72rem;
-  font-weight: 900;
-}
-
 .button-row {
   display: flex;
   gap: 12px;

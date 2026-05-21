@@ -54,6 +54,8 @@ class CasLogController extends Controller
                 return;
             }
 
+            fwrite($handle, "\xEF\xBB\xBF");
+
             fputcsv($handle, [
                 'created_at',
                 'source',
@@ -72,12 +74,12 @@ class CasLogController extends Controller
                         fputcsv($handle, [
                             optional($log->created_at)->toISOString(),
                             $log->source,
-                            $log->command,
+                            $this->csvText($log->command),
                             $log->successful ? 'true' : 'false',
                             $log->execution_ms,
-                            $log->error_message,
+                            $this->csvText($log->error_message),
                             $log->ip_address,
-                            $log->user_agent,
+                            $this->csvText($log->user_agent),
                         ]);
                     }
                 });
@@ -118,5 +120,13 @@ class CasLogController extends Controller
             'ipAddress' => $log->ip_address,
             'userAgent' => $log->user_agent,
         ];
+    }
+    private function csvText(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return str_replace(["\r\n", "\r", "\n"], '\n', $value);
     }
 }

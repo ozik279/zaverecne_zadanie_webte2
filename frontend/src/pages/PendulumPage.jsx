@@ -28,7 +28,7 @@ export default function PendulumPage({ language }) {
         initialAngularVelocity: { min: -1, max: 1 },
         duration: { min: 0.5, max: 10, inputStep: 0.5 },
         step: { min: 0.01, max: 0.1, inputStep: 0.01 },
-        slowdownMs: { min: 0, max: 5000, inputStep: 1 },
+        slowdownMs: { min: 0, max: 1000, inputStep: 1 },
       }}
       languageStrings={t}
     />

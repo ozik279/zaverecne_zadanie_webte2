@@ -42,8 +42,9 @@ class OctaveSimulationRunner
         File::put($scriptPath, $script);
 
         try {
+            $octaveBinary = (string) config('simulations.octave_binary', 'octave');
             $process = new Process([
-                'octave',
+                $octaveBinary,
                 '--quiet',
                 '--no-gui',
                 $scriptPath,

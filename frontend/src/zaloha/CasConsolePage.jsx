@@ -7,22 +7,13 @@ export default function CasConsolePage({ language }) {
   const [command, setCommand] = useState('a=1+1\na+2')
   const [output, setOutput] = useState('')
   const [error, setError] = useState('')
-  const [commandError, setCommandError] = useState('')
   const [loading, setLoading] = useState(false)
   const highlighted = highlightCas(command)
 
   async function execute(event) {
     event.preventDefault()
-
-    if (!command.trim()) {
-      setCommandError(t.validation.casCommandRequired)
-      setError(t.validationSummary)
-      return
-    }
-
     setLoading(true)
     setError('')
-    setCommandError('')
 
     try {
       const data = await requestJson('/cas/execute', {
@@ -64,35 +55,20 @@ export default function CasConsolePage({ language }) {
       </section>
 
       <section className="panel-grid console-grid">
-        <form className="card form-card tool-card" onSubmit={execute} noValidate>
+        <form className="card form-card tool-card" onSubmit={execute}>
           <div className="section-head">
             <h2>{t.casCommand}</h2>
           </div>
 
-          <label className={`field syntax-field ${commandError ? 'field-has-error' : ''}`}>
+          <label className="field syntax-field">
             <div className="syntax-editor">
               <pre aria-hidden="true" dangerouslySetInnerHTML={{ __html: highlighted }} />
               <textarea
                 spellCheck="false"
                 value={command}
-                required
-                aria-invalid={commandError ? 'true' : 'false'}
-                aria-describedby={commandError ? 'cas-command-error' : undefined}
-                onInvalid={(event) => event.preventDefault()}
-                onChange={(event) => {
-                  setCommand(event.target.value)
-                  if (commandError && event.target.value.trim()) {
-                    setCommandError('')
-                    setError('')
-                  }
-                }}
+                onChange={(event) => setCommand(event.target.value)}
               />
             </div>
-            {commandError ? (
-              <small id="cas-command-error" className="field-error-message">
-                {commandError}
-              </small>
-            ) : null}
           </label>
 
           <div className="button-row">

@@ -13,6 +13,7 @@ class IpLocationResolverTest extends TestCase
         config([
             'services.ip_geolocation.enabled' => true,
             'services.ip_geolocation.url' => 'https://geo.example/{ip}',
+            'services.ip_geolocation.dev_fallback_ip' => '',
         ]);
 
         Http::fake();
@@ -48,6 +49,36 @@ class IpLocationResolverTest extends TestCase
         $this->assertSame([
             'city' => 'Mountain View',
             'country' => 'United States',
+        ], $location);
+    }
+
+    public function test_browser_coordinates_take_precedence_over_ip_lookup(): void
+    {
+        config([
+            'services.ip_geolocation.enabled' => true,
+            'services.ip_geolocation.url' => 'https://geo.example/{ip}',
+            'services.ip_geolocation.timeout' => 1,
+        ]);
+
+        Http::fake([
+            'https://nominatim.openstreetmap.org/reverse*' => Http::response([
+                'address' => [
+                    'city' => 'Bratislava',
+                    'country' => 'Slovakia',
+                ],
+            ]),
+            'https://geo.example/*' => Http::response([
+                'status' => 'success',
+                'city' => 'Mountain View',
+                'country' => 'United States',
+            ]),
+        ]);
+
+        $location = (new IpLocationResolver())->resolve('8.8.8.8', 48.1486, 17.1077);
+
+        $this->assertSame([
+            'city' => 'Bratislava',
+            'country' => 'Slovakia',
         ], $location);
     }
 }

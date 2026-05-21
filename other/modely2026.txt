@@ -1,0 +1,91 @@
+Prevrátené kyvadlo
+octave:2> M = .5;
+m = 0.2;
+b = 0.1;
+I = 0.006;
+g = 9.8;
+l = 0.3;
+p = I*(M+m)+M*m*l^2;
+A = [0 1 0 0; 0 -(I+m*l^2)*b/p (m^2*g*l^2)/p 0; 0 0 0 1; 0 -(m*l*b)/p m*g*l*(M+m)/p 0];
+B = [ 0; (I+m*l^2)/p; 0; m*l/p];
+C = [1 0 0 0; 0 0 1 0];
+D = [0; 0];
+K = lqr(A,B,C'*C,1);
+Ac = [(A-B*K)];
+N = -inv(C(1,:)*inv(A-B*K)*B);
+
+sys = ss(Ac,B*N,C,D);
+
+t = 0:0.05:10;
+r =0.2;
+initPozicia=0;
+initUhol=0;
+[y,t,x]=lsim(sys,r*ones(size(t)),t,[initPozicia;0;initUhol;0]);
+plot(t,y)
+                                                Modrá čiara označuje v čase meniacu sa pozíciu
+                                                kyvadla a oranžová čiara uhol jeho vychýlenia v
+                                                radiánoch.
+
+                                                Pri prvom spustení sú nastavené nulové počiatočné
+                                                podmienky.
+
+                                                Pri druhom spustení sú nastavené ako počiatočné
+                                                podmienky úplne posledné hodnoty z prvého grafu
+                                                (všimnite si, že v prvom obrázku modrý graf končí na
+                                                hodnote 0.2 a v druhom obrázku modrý graf začína
+                                                na 0.2)
+
+                                                Medzi grafmi sa mení hodnota parametra r, ktorý
+                                                označuje, na akú pozíciu sa má kyvadlo presunúť.
+octave:23> r=0.5;
+[y,t,x]=lsim(sys,r*ones(size(t)),t,x(size(x,1),:));
+plot(t,y)
+Gulička na tyči
+octave:2> m = 0.111;
+R = 0.015;
+g = -9.8;
+J = 9.99e-6;
+H = -m*g/(J/(R^2)+m);
+A = [0 1 0 0; 0 0 H 0; 0 0 0 1; 0 0 0 0];
+B = [0;0;0;1];
+C = [1 0 0 0];
+D = [0];
+K = place(A,B,[-2+2i,-2-2i,-20,-80]);
+N = -inv(C*inv(A-B*K)*B);
+
+sys = ss(A-B*K,B,C,D);
+
+t = 0:0.01:5;
+r =0.25;
+initRychlost=0;
+initZrychlenie=0;
+[y,t,x]=lsim(N*sys,r*ones(size(t)),t,[initRychlost;0;initZrychlenie;0]);
+plot(t,y)
+                                                Graf označuje v čase meniacu sa pozíciu guličky.
+
+                                                Pri prvom spustení sú nastavené nulové počiatočné
+                                                podmienky.
+
+                                                Pri druhom spustení sú nastavené ako počiatočné
+                                                podmienky úplne posledné hodnoty z prvého grafu
+                                                (všimnite si, že v prvom obrázku graf končí na
+                                                hodnote 0.25 a v druhom obrázku modrý graf začína
+                                                na 0.25)
+
+                                                Medzi grafmi sa mení hodnota parametra r, ktorý
+                                                označuje, na akú pozíciu sa má gulička presunúť.
+
+
+octave:23> r =0.5;
+[y,t,x]=lsim(N*sys,r*ones(size(t)),t,x(size(x,1),:));
+plot(t,y)
+
+
+                                                Uhol naklonenia tyče v závislosti od času je na
+                                                poslednom obrázku.
+
+
+
+
+octave:23> plot(t,x(:,3))
+

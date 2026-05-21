@@ -113,7 +113,7 @@ use OpenApi\Attributes as OA;
                     new OA\Property(property: 'initialAngularVelocity', description: 'Initial pendulum angular velocity, fourth state of the lsim initial vector.', type: 'number', minimum: -1, maximum: 1, nullable: true),
                     new OA\Property(property: 'duration', description: 'Simulation duration in seconds.', type: 'number', minimum: 0.5, maximum: 10, nullable: true),
                     new OA\Property(property: 'step', description: 'Calculation time step in seconds.', type: 'number', minimum: 0.01, maximum: 0.1, nullable: true),
-                    new OA\Property(property: 'slowdownMs', description: 'Animation slowdown in milliseconds per frame. Zero uses smooth default playback.', type: 'integer', minimum: 0, maximum: 5000, nullable: true),
+                    new OA\Property(property: 'slowdownMs', description: 'Animation slowdown in milliseconds per frame. Zero uses smooth default playback.', type: 'integer', minimum: 0, maximum: 1000, nullable: true),
                 ],
             ),
             new OA\Schema(
@@ -128,7 +128,7 @@ use OpenApi\Attributes as OA;
                     new OA\Property(property: 'initialBeamAngularVelocity', description: 'Initial beam angular velocity, fourth state of the lsim initial vector.', type: 'number', minimum: -2, maximum: 2, nullable: true),
                     new OA\Property(property: 'duration', description: 'Simulation duration in seconds.', type: 'number', minimum: 0.1, maximum: 5, nullable: true),
                     new OA\Property(property: 'step', description: 'Calculation time step in seconds.', type: 'number', minimum: 0.005, maximum: 0.05, nullable: true),
-                    new OA\Property(property: 'slowdownMs', description: 'Animation slowdown in milliseconds per frame. Zero uses smooth default playback.', type: 'integer', minimum: 0, maximum: 5000, nullable: true),
+                    new OA\Property(property: 'slowdownMs', description: 'Animation slowdown in milliseconds per frame. Zero uses smooth default playback.', type: 'integer', minimum: 0, maximum: 1000, nullable: true),
                 ],
             ),
             new OA\Schema(

@@ -106,8 +106,7 @@ export default function StatisticsPage({ language }) {
               onClick={() => setSelectedSimulation(item.simulation)}
             >
               <strong>{labelForSimulation(item.simulation, t)}</strong>
-              <span>{t.runs}: {item.runs}</span>
-              <span>{t.usages}: {item.usages}</span>
+              <span>{t.runs}: {item.usages}</span>
             </button>
           ))}
         </div>
@@ -130,29 +129,15 @@ function SimulationStatisticsDetail({ detail, t }) {
       </div>
 
       <div className="detail-grid">
-        <div className="detail-card"><span>{t.successfulRuns}</span><strong>{detail.successfulRuns}</strong></div>
-        <div className="detail-card"><span>{t.lastRunAt}</span><strong>{formatDate(detail.lastRunAt)}</strong></div>
-        <div className="detail-card"><span>{t.lastUsageAt}</span><strong>{formatDate(detail.lastUsageAt)}</strong></div>
+        <div className="detail-card"><span>{t.runs}</span><strong>{detail.usages}</strong></div>
+        <div className="detail-card"><span>{t.lastRunAt}</span><strong>{formatDate(detail.lastUsageAt)}</strong></div>
       </div>
 
       <DetailTable
-        title={t.recentUsages}
+        title={t.recentRuns}
         rows={detail.recentUsages || []}
         columns={[
           ['createdAt', t.createdAt, formatDate],
-          ['city', t.city],
-          ['country', t.country],
-        ]}
-        emptyText={t.noData}
-      />
-
-      <DetailTable
-        title={t.recentRuns}
-        rows={detail.recentRuns || []}
-        columns={[
-          ['createdAt', t.createdAt, formatDate],
-          ['successful', t.status, (value) => value ? t.successful : t.failed],
-          ['durationMs', t.durationMs, (value) => value == null ? '-' : `${value} ms`],
           ['city', t.city],
           ['country', t.country],
         ]}

@@ -1,7 +1,17 @@
-const DEFAULT_API_BASE_URL = '/api'
+const DEFAULT_API_BASE_URL = deriveDefaultApiBaseUrl()
 
 export function getApiBaseUrl() {
   return (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '')
+}
+
+function deriveDefaultApiBaseUrl() {
+  const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
+
+  if (!basePath || basePath === '') {
+    return '/api'
+  }
+
+  return `${basePath}/api`
 }
 
 export function getApiKey() {

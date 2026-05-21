@@ -90,6 +90,40 @@ class CasLogTest extends TestCase
         $this->assertStringNotContainsString('a=1+1', $csv);
     }
 
+    public function test_logs_csv_export_keeps_multiline_values_on_single_physical_row(): void
+    {
+        $command = "Assume(k>0, Extremum(k*3*x^2/4-2*x/2))\nyields {(2/(3*k), -1/(3*k))}";
+        $errorMessage = "parse error:\n\n  syntax error";
+
+        $this->createLog(
+            command: $command,
+            successful: false,
+            clientToken: 'client-1',
+            errorMessage: $errorMessage,
+        );
+
+        $response = $this->get('/api/logs/export.csv', ['X-API-Key' => 'test-key']);
+
+        $response->assertOk();
+
+        $csv = $response->streamedContent();
+        $lines = preg_split('/\R/', trim($csv));
+
+        $this->assertIsArray($lines);
+        $this->assertCount(2, $lines);
+        $this->assertStringStartsWith("\xEF\xBB\xBFcreated_at", $lines[0]);
+
+        $row = str_getcsv($lines[1]);
+
+        $this->assertCount(8, $row);
+        $this->assertSame(
+            'Assume(k>0, Extremum(k*3*x^2/4-2*x/2))\nyields {(2/(3*k), -1/(3*k))}',
+            $row[2],
+        );
+        $this->assertSame('parse error:\n\n  syntax error', $row[5]);
+    }
+
+
     private function createLog(
         string $command,
         bool $successful,

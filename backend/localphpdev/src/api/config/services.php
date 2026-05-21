@@ -39,6 +39,7 @@ return [
         'enabled' => (bool) env('IP_GEOLOCATION_ENABLED', false),
         'url' => env('IP_GEOLOCATION_URL', 'http://ip-api.com/json/{ip}?fields=status,country,city,message'),
         'timeout' => (float) env('IP_GEOLOCATION_TIMEOUT', 2.0),
+        'dev_fallback_ip' => env('IP_GEOLOCATION_DEV_FALLBACK_IP', ''),
     ],
 
 ];

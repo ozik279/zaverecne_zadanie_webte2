@@ -200,13 +200,17 @@ class SimulationEndpointsTest extends TestCase
 class FakeIpLocationResolver extends IpLocationResolver
 {
     public ?string $lastIpAddress = null;
+    public ?float $lastLatitude = null;
+    public ?float $lastLongitude = null;
 
     /**
      * @return array{city: string, country: string}
      */
-    public function resolve(?string $ipAddress): array
+    public function resolve(?string $ipAddress, ?float $latitude = null, ?float $longitude = null): array
     {
         $this->lastIpAddress = $ipAddress;
+        $this->lastLatitude = $latitude;
+        $this->lastLongitude = $longitude;
 
         return [
             'city' => 'Bratislava',
