@@ -11,6 +11,7 @@ export function getApiKey() {
 export async function requestJson(path, options = {}) {
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...options,
+    credentials: options.credentials || 'same-origin',
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
@@ -28,6 +29,40 @@ export async function requestJson(path, options = {}) {
   }
 
   return data
+}
+
+export async function requestBlob(path, options = {}) {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+    ...options,
+    credentials: options.credentials || 'same-origin',
+    headers: {
+      Accept: options.accept || '*/*',
+      ...(getApiKey() ? { 'X-API-Key': getApiKey() } : {}),
+      ...(options.headers || {}),
+    },
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    const data = text ? safeJsonParse(text) : null
+    const message = data?.message || data?.error || data?.detail || response.statusText || 'Request failed.'
+    throw new Error(message)
+  }
+
+  return response.blob()
+}
+
+export function buildQuery(params) {
+  const query = new URLSearchParams()
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.set(key, value)
+    }
+  })
+
+  const text = query.toString()
+  return text ? `?${text}` : ''
 }
 
 function safeJsonParse(text) {

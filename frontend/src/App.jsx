@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, Route, Routes } from 'react-router-dom'
+import { Link, Navigate, NavLink, Route, Routes } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import PendulumPage from './pages/PendulumPage'
 import BallBeamPage from './pages/BallBeamPage'
 import StatisticsPage from './pages/StatisticsPage'
 import CasConsolePage from './pages/CasConsolePage'
+import LogsPage from './pages/LogsPage'
+import ApiDocsPage from './pages/ApiDocsPage'
 import { translations } from './i18n'
 
 export default function App() {
@@ -22,11 +24,13 @@ export default function App() {
         <Link className="brand" to="/">
           {t.appName}
         </Link>
-        <nav className="nav">
-          <Link to="/pendulum">{t.pendulum}</Link>
-          <Link to="/ball-beam">{t.ballBeam}</Link>
-          <Link to="/statistics">{t.statistics}</Link>
-          <Link to="/cas-console">{t.casConsole}</Link>
+        <nav className="nav" aria-label="Primary navigation">
+          <NavLink to="/console">{t.casConsole}</NavLink>
+          <NavLink to="/pendulum">{t.pendulum}</NavLink>
+          <NavLink to="/ball-beam">{t.ballBeam}</NavLink>
+          <NavLink to="/logs">{t.logs}</NavLink>
+          <NavLink to="/api-docs">{t.apiDocs}</NavLink>
+          <NavLink to="/statistics">{t.statistics}</NavLink>
         </nav>
         <label className="language-switch">
           <span>{t.language}</span>
@@ -42,7 +46,10 @@ export default function App() {
         <Route path="/pendulum" element={<PendulumPage language={language} />} />
         <Route path="/ball-beam" element={<BallBeamPage language={language} />} />
         <Route path="/statistics" element={<StatisticsPage language={language} />} />
-        <Route path="/cas-console" element={<CasConsolePage language={language} />} />
+        <Route path="/console" element={<CasConsolePage language={language} />} />
+        <Route path="/logs" element={<LogsPage language={language} />} />
+        <Route path="/api-docs" element={<ApiDocsPage language={language} />} />
+        <Route path="/cas-console" element={<Navigate to="/console" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>

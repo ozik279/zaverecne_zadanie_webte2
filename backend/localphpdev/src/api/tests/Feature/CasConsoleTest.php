@@ -26,10 +26,11 @@ class CasConsoleTest extends TestCase
 
     public function test_execute_keeps_successful_commands_in_session_history(): void
     {
-        $this->postJson('/api/cas/execute', [
-            'clientToken' => 'client-1',
-            'command' => 'a=1+1',
-        ], ['X-API-Key' => 'test-key'])
+        $this->withCredentials()
+            ->withUnencryptedCookie('cas_client_token', 'client-1')
+            ->postJson('/api/cas/execute', [
+                'command' => 'a=1+1',
+            ], ['X-API-Key' => 'test-key'])
             ->assertOk()
             ->assertJson([
                 'success' => true,
@@ -37,10 +38,11 @@ class CasConsoleTest extends TestCase
             ])
             ->assertJsonPath('stdout', "a = 2\n");
 
-        $this->postJson('/api/cas/execute', [
-            'clientToken' => 'client-1',
-            'command' => 'a+2',
-        ], ['X-API-Key' => 'test-key'])
+        $this->withCredentials()
+            ->withUnencryptedCookie('cas_client_token', 'client-1')
+            ->postJson('/api/cas/execute', [
+                'command' => 'a+2',
+            ], ['X-API-Key' => 'test-key'])
             ->assertOk()
             ->assertJson([
                 'success' => true,
@@ -55,14 +57,15 @@ class CasConsoleTest extends TestCase
 
     public function test_reset_clears_session_history(): void
     {
-        $this->postJson('/api/cas/execute', [
-            'clientToken' => 'client-2',
-            'command' => 'a=1+1',
-        ], ['X-API-Key' => 'test-key'])->assertOk();
+        $this->withCredentials()
+            ->withUnencryptedCookie('cas_client_token', 'client-2')
+            ->postJson('/api/cas/execute', [
+                'command' => 'a=1+1',
+            ], ['X-API-Key' => 'test-key'])->assertOk();
 
-        $this->postJson('/api/cas/reset', [
-            'clientToken' => 'client-2',
-        ], ['X-API-Key' => 'test-key'])
+        $this->withCredentials()
+            ->withUnencryptedCookie('cas_client_token', 'client-2')
+            ->postJson('/api/cas/reset', [], ['X-API-Key' => 'test-key'])
             ->assertOk()
             ->assertJson([
                 'success' => true,
@@ -71,10 +74,11 @@ class CasConsoleTest extends TestCase
 
         $this->assertDatabaseMissing('cas_sessions', ['client_token' => 'client-2']);
 
-        $this->postJson('/api/cas/execute', [
-            'clientToken' => 'client-2',
-            'command' => 'a+2',
-        ], ['X-API-Key' => 'test-key'])
+        $this->withCredentials()
+            ->withUnencryptedCookie('cas_client_token', 'client-2')
+            ->postJson('/api/cas/execute', [
+                'command' => 'a+2',
+            ], ['X-API-Key' => 'test-key'])
             ->assertUnprocessable()
             ->assertJson([
                 'success' => false,
@@ -84,10 +88,11 @@ class CasConsoleTest extends TestCase
 
     public function test_failed_command_is_logged_and_not_added_to_history(): void
     {
-        $this->postJson('/api/cas/execute', [
-            'clientToken' => 'client-3',
-            'command' => 'bad command',
-        ], ['X-API-Key' => 'test-key'])
+        $this->withCredentials()
+            ->withUnencryptedCookie('cas_client_token', 'client-3')
+            ->postJson('/api/cas/execute', [
+                'command' => 'bad command',
+            ], ['X-API-Key' => 'test-key'])
             ->assertUnprocessable()
             ->assertJson([
                 'success' => false,
@@ -102,6 +107,21 @@ class CasConsoleTest extends TestCase
             'successful' => false,
             'error_message' => 'parse error',
         ]);
+    }
+
+    public function test_execute_creates_cookie_backed_session_when_cookie_is_missing(): void
+    {
+        $this->postJson('/api/cas/execute', [
+            'command' => 'a=1+1',
+        ], ['X-API-Key' => 'test-key'])
+            ->assertOk()
+            ->assertCookie('cas_client_token')
+            ->assertJson([
+                'success' => true,
+                'historyLength' => 1,
+            ]);
+
+        $this->assertSame(1, CasSession::query()->count());
     }
 }
 

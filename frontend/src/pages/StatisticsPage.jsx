@@ -5,10 +5,11 @@ import { translations } from '../i18n'
 export default function StatisticsPage({ language }) {
   const t = translations[language]
   const [data, setData] = useState([])
-  const [selectedSimulation, setSelectedSimulation] = useState('inverted-pendulum')
+  const [selectedSimulation, setSelectedSimulation] = useState('')
   const [detail, setDetail] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [detailLoading, setDetailLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -23,14 +24,8 @@ export default function StatisticsPage({ language }) {
           return
         }
 
-        setData(summary.data || [])
-        const nextSelected = summary.data?.[0]?.simulation || 'inverted-pendulum'
-        setSelectedSimulation(nextSelected)
-        const nextDetail = await requestJson(`/statistics/${nextSelected}`)
-
-        if (!cancelled) {
-          setDetail(nextDetail.data || null)
-        }
+        const summaryRows = summary.data || []
+        setData(summaryRows)
       } catch (requestError) {
         if (!cancelled) {
           setError(requestError.message)
@@ -54,17 +49,26 @@ export default function StatisticsPage({ language }) {
 
     async function loadDetail() {
       if (!selectedSimulation) {
+        setDetail(null)
         return
       }
 
+      setDetailLoading(true)
+
       try {
         const response = await requestJson(`/statistics/${selectedSimulation}`)
+
         if (!cancelled) {
           setDetail(response.data || null)
         }
-      } catch {
+      } catch (requestError) {
         if (!cancelled) {
+          setError(requestError.message)
           setDetail(null)
+        }
+      } finally {
+        if (!cancelled) {
+          setDetailLoading(false)
         }
       }
     }
@@ -77,22 +81,20 @@ export default function StatisticsPage({ language }) {
   }, [selectedSimulation])
 
   return (
-    <main className="page">
-      <section className="hero compact">
+    <main className="page tool-page statistics-page">
+      <section className="hero compact tool-hero">
         <div>
           <p className="eyebrow">{t.statistics}</p>
           <h1>{t.statistics}</h1>
-          <p className="hero-copy">{t.statisticsHelp}</p>
         </div>
       </section>
 
-      <section className="card">
+      <section className="card tool-card">
         <div className="section-head">
           <h2>{t.metrics}</h2>
-          <p>{t.statisticsHelp}</p>
         </div>
 
-        {loading ? <div className="empty-state">{t.loading}</div> : null}
+        {loading ? <div className="empty-state">{t.loadingData}</div> : null}
         {error ? <div className="alert error">{error}</div> : null}
 
         <div className="stats-grid">
@@ -103,50 +105,60 @@ export default function StatisticsPage({ language }) {
               className={`stats-card ${selectedSimulation === item.simulation ? 'active' : ''}`}
               onClick={() => setSelectedSimulation(item.simulation)}
             >
-              <strong>{item.simulation}</strong>
+              <strong>{labelForSimulation(item.simulation, t)}</strong>
               <span>{t.runs}: {item.runs}</span>
               <span>{t.usages}: {item.usages}</span>
             </button>
           ))}
         </div>
 
-        {detail ? (
-          <>
-            <div className="detail-grid">
-              <div className="detail-card"><span>{t.runs}</span><strong>{detail.runs}</strong></div>
-              <div className="detail-card"><span>{t.successfulRuns}</span><strong>{detail.successfulRuns}</strong></div>
-              <div className="detail-card"><span>{t.usages}</span><strong>{detail.usages}</strong></div>
-              <div className="detail-card"><span>{t.lastRunAt}</span><strong>{formatDate(detail.lastRunAt)}</strong></div>
-              <div className="detail-card"><span>{t.lastUsageAt}</span><strong>{formatDate(detail.lastUsageAt)}</strong></div>
-            </div>
+        {detailLoading ? <div className="empty-state">{t.loadingData}</div> : null}
 
-            <DetailTable
-              title={t.recentUsages}
-              rows={detail.recentUsages || []}
-              columns={[
-                ['createdAt', t.createdAt, formatDate],
-                ['city', t.city],
-                ['country', t.country],
-              ]}
-              emptyText={t.noData}
-            />
+        {!selectedSimulation && !loading ? <div className="empty-state">{t.selectSimulation}</div> : null}
 
-            <DetailTable
-              title={t.recentRuns}
-              rows={detail.recentRuns || []}
-              columns={[
-                ['createdAt', t.createdAt, formatDate],
-                ['successful', t.status, (value) => value ? t.successful : t.failed],
-                ['durationMs', t.durationMs, (value) => value == null ? '-' : `${value} ms`],
-                ['city', t.city],
-                ['country', t.country],
-              ]}
-              emptyText={t.noData}
-            />
-          </>
-        ) : null}
+        {detail && !detailLoading ? <SimulationStatisticsDetail detail={detail} t={t} /> : null}
       </section>
     </main>
+  )
+}
+
+function SimulationStatisticsDetail({ detail, t }) {
+  return (
+    <section className="statistics-detail-section">
+      <div className="section-head">
+        <h2>{labelForSimulation(detail.simulation, t)}</h2>
+      </div>
+
+      <div className="detail-grid">
+        <div className="detail-card"><span>{t.successfulRuns}</span><strong>{detail.successfulRuns}</strong></div>
+        <div className="detail-card"><span>{t.lastRunAt}</span><strong>{formatDate(detail.lastRunAt)}</strong></div>
+        <div className="detail-card"><span>{t.lastUsageAt}</span><strong>{formatDate(detail.lastUsageAt)}</strong></div>
+      </div>
+
+      <DetailTable
+        title={t.recentUsages}
+        rows={detail.recentUsages || []}
+        columns={[
+          ['createdAt', t.createdAt, formatDate],
+          ['city', t.city],
+          ['country', t.country],
+        ]}
+        emptyText={t.noData}
+      />
+
+      <DetailTable
+        title={t.recentRuns}
+        rows={detail.recentRuns || []}
+        columns={[
+          ['createdAt', t.createdAt, formatDate],
+          ['successful', t.status, (value) => value ? t.successful : t.failed],
+          ['durationMs', t.durationMs, (value) => value == null ? '-' : `${value} ms`],
+          ['city', t.city],
+          ['country', t.country],
+        ]}
+        emptyText={t.noData}
+      />
+    </section>
   )
 }
 
@@ -160,8 +172,8 @@ function DetailTable({ title, rows, columns, emptyText }) {
       {rows.length === 0 ? (
         <div className="empty-state">{emptyText}</div>
       ) : (
-        <div className="detail-table-wrap">
-          <table className="detail-table">
+        <div className="table-wrap">
+          <table className="data-table">
             <thead>
               <tr>
                 {columns.map(([key, label]) => <th key={key}>{label}</th>)}
@@ -181,6 +193,18 @@ function DetailTable({ title, rows, columns, emptyText }) {
       )}
     </section>
   )
+}
+
+function labelForSimulation(simulation, t) {
+  if (simulation === 'inverted-pendulum') {
+    return t.pendulum
+  }
+
+  if (simulation === 'ball-beam') {
+    return t.ballBeam
+  }
+
+  return simulation
 }
 
 function formatDate(value) {

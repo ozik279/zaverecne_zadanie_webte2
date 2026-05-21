@@ -1,43 +1,103 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 const COLORS = ['#ffb703', '#8ecae6', '#fb8500', '#219ebc']
+const SMOOTH_FRAME_DELAY_MS = 1000 / 60
 
-export default function SimulationViz({ simulation, frames, time, series = [], title, languageStrings, playing, onTogglePlaying, playbackDelayMs = 80 }) {
-  const [index, setIndex] = useState(0)
+export default function SimulationViz({ simulation, frames, time, series = [], languageStrings, playing, onTogglePlaying, onResetPlayback, onPlaybackEnd, playbackDelayMs = 0 }) {
+  const [framePosition, setFramePosition] = useState(0)
+  const framePositionRef = useRef(0)
+  const lastTimestampRef = useRef(null)
+  const playbackEndRef = useRef(onPlaybackEnd)
 
   useEffect(() => {
-    setIndex(0)
-  }, [frames])
+    playbackEndRef.current = onPlaybackEnd
+  }, [onPlaybackEnd])
 
   useEffect(() => {
     if (!playing || frames.length <= 1) {
+      lastTimestampRef.current = null
       return undefined
     }
 
-    const delay = Math.max(40, Number(playbackDelayMs) || 80)
-    const timer = window.setInterval(() => {
-      setIndex((current) => (current >= frames.length - 1 ? current : current + 1))
-    }, delay)
+    let animationFrameId = null
+    let cancelled = false
+    const lastFrameIndex = frames.length - 1
+    const frameDelay = resolveFrameDelayMs(playbackDelayMs)
 
-    return () => window.clearInterval(timer)
+    function tick(timestamp) {
+      if (cancelled) {
+        return
+      }
+
+      if (lastTimestampRef.current === null) {
+        lastTimestampRef.current = timestamp
+      }
+
+      const elapsedMs = timestamp - lastTimestampRef.current
+      lastTimestampRef.current = timestamp
+      const nextPosition = Math.min(lastFrameIndex, framePositionRef.current + elapsedMs / frameDelay)
+
+      framePositionRef.current = nextPosition
+      setFramePosition(nextPosition)
+
+      if (nextPosition >= lastFrameIndex) {
+        lastTimestampRef.current = null
+        playbackEndRef.current?.()
+        return
+      }
+
+      animationFrameId = window.requestAnimationFrame(tick)
+    }
+
+    animationFrameId = window.requestAnimationFrame(tick)
+
+    return () => {
+      cancelled = true
+      lastTimestampRef.current = null
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId)
+      }
+    }
   }, [frames.length, playbackDelayMs, playing])
 
-  const currentFrame = frames[index] || null
+  const lastFrameIndex = Math.max(0, frames.length - 1)
+  const currentFramePosition = clamp(framePosition, 0, lastFrameIndex)
+  const currentFrame = interpolateFrame(frames, currentFramePosition)
+  const currentFrameIndex = Math.min(Math.floor(currentFramePosition), lastFrameIndex)
+  const currentTime = currentFrame?.time ?? interpolateSeriesValue(time, currentFramePosition, 0)
   const availableSeries = useMemo(() => series.filter((item) => Array.isArray(item.values) && item.values.length > 0), [series])
+  const animationMetrics = buildAnimationMetrics(simulation, currentFrame, currentTime, languageStrings)
+  const graphMetrics = availableSeries.map((item, seriesIndex) => ({
+    color: COLORS[seriesIndex % COLORS.length],
+    label: labelForSeries(item.name, languageStrings),
+    value: interpolateSeriesValue(item.values, currentFramePosition, item.values[item.values.length - 1] ?? 0),
+  }))
 
   const svgWidth = 640
   const svgHeight = 240
 
+  function updateFramePosition(value) {
+    const boundedValue = clamp(Number(value) || 0, 0, lastFrameIndex)
+    framePositionRef.current = boundedValue
+    setFramePosition(boundedValue)
+  }
+
+  function resetPlayback() {
+    updateFramePosition(0)
+    onResetPlayback?.()
+  }
+
   return (
-    <section className="viz-card">
+    <section className="simulation-viz">
       <div className="viz-header">
-        <div>
-          <p className="eyebrow">{title}</p>
-          <h2>{simulation}</h2>
+        <div className="button-row viz-actions">
+          <button className="ghost-button" type="button" onClick={resetPlayback}>
+            {languageStrings.resetAnimation}
+          </button>
+          <button className="ghost-button" type="button" onClick={onTogglePlaying}>
+            {playing ? languageStrings.pause : languageStrings.play}
+          </button>
         </div>
-        <button className="ghost-button" type="button" onClick={onTogglePlaying}>
-          {playing ? languageStrings.pause : languageStrings.play}
-        </button>
       </div>
 
       <div className="viz-layout">
@@ -48,21 +108,23 @@ export default function SimulationViz({ simulation, frames, time, series = [], t
             {simulation === 'inverted-pendulum' ? (
               <InvertedPendulumScene frame={currentFrame} />
             ) : (
-              <BallBeamScene frame={currentFrame} frames={frames} index={index} />
+              <BallBeamScene frame={currentFrame} frames={frames} framePosition={currentFramePosition} />
             )}
           </svg>
           <input
             className="range"
             type="range"
             min="0"
-            max={Math.max(0, frames.length - 1)}
-            value={Math.min(index, Math.max(0, frames.length - 1))}
-            onChange={(event) => setIndex(Number(event.target.value))}
+            max={lastFrameIndex}
+            step="any"
+            value={currentFramePosition}
+            onChange={(event) => updateFramePosition(event.target.value)}
           />
           <div className="range-caption">
-            <span>{languageStrings.frame} {index + 1} {languageStrings.of} {Math.max(frames.length, 1)}</span>
-            <span>t = {formatNumber(currentFrame?.time ?? time[index] ?? 0)}</span>
+            <span>{languageStrings.frame} {currentFrameIndex + 1} {languageStrings.of} {Math.max(frames.length, 1)}</span>
+            <span>t = {formatNumber(currentTime)}</span>
           </div>
+          <InfoPanel title={languageStrings.currentSimulationValues} metrics={animationMetrics} />
         </div>
 
         <div className="graph-panel">
@@ -78,8 +140,9 @@ export default function SimulationViz({ simulation, frames, time, series = [], t
                 return `${x},${y}`
               }).join(' ')
 
-              const currentX = 48 + (index / Math.max(1, item.values.length - 1)) * 562
-              const currentY = scaleSeriesValue(item.values[index] ?? item.values[item.values.length - 1] ?? 0, item.values, 30, 170, simulation, item.name)
+              const seriesPosition = clamp(currentFramePosition, 0, item.values.length - 1)
+              const currentX = 48 + (seriesPosition / Math.max(1, item.values.length - 1)) * 562
+              const currentY = scaleSeriesValue(interpolateSeriesValue(item.values, seriesPosition, item.values[item.values.length - 1] ?? 0), item.values, 30, 170, simulation, item.name)
 
               return (
                 <g key={item.name}>
@@ -104,37 +167,66 @@ export default function SimulationViz({ simulation, frames, time, series = [], t
               </div>
             ))}
           </div>
+          <InfoPanel title={languageStrings.currentGraphValues} metrics={graphMetrics} />
         </div>
       </div>
     </section>
   )
 }
 
+function InfoPanel({ title, metrics }) {
+  if (!metrics.length) {
+    return null
+  }
+
+  return (
+    <div className="info-panel">
+      <div className="info-title">{title}</div>
+      <div className="info-grid">
+        {metrics.map((metric) => (
+          <div key={metric.label} className="info-value">
+            <span>
+              {metric.color ? <i className="info-dot" style={{ background: metric.color }} /> : null}
+              {metric.label}
+            </span>
+            <strong>{formatNumber(metric.value)}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function InvertedPendulumScene({ frame }) {
   const cartX = clamp(180 + (finiteNumber(frame?.cartX, 0) * 260), 124, 676)
-  const rawPendulumTipX = 180 + (finiteNumber(frame?.pendulumTipX, 0) * 260)
+  const cartTopY = 170
+  const cartBottomY = 222
+  const rodLength = 132
+  const angle = finiteNumber(frame?.pendulum_angle ?? frame?.angle, 0)
 
-  // Inverted pendulum is drawn upwards from the cart. In SVG, smaller Y means higher.
-  const pendulumTipY = clamp(180 + (finiteNumber(frame?.pendulumTipY, -0.3) * 200), 64, 238)
+  // The simulated pendulum is 0.3 m long. The drawing uses a larger pixel length
+  // so small model angles stay visible in the frontend animation.
+  const pendulumTipX = clamp(cartX + rodLength * Math.sin(angle), 70, 730)
+  const pendulumTipY = clamp(cartTopY - rodLength * Math.cos(angle), 28, 236)
   const referenceX = clamp(180 + (finiteNumber(frame?.reference, 0) * 260), 70, 730)
-  const pendulumTipX = clamp(rawPendulumTipX, 70, 730)
 
   return (
     <g>
-      <line x1={referenceX} y1="60" x2={referenceX} y2="240" stroke="#fb8500" strokeDasharray="8 8" strokeWidth="3" />
+      <line x1={referenceX} y1="36" x2={referenceX} y2="240" stroke="#fb8500" strokeDasharray="8 8" strokeWidth="3" />
       <line x1="70" y1="220" x2="650" y2="220" stroke="#94a3b8" strokeWidth="4" />
-      <rect x={cartX - 58} y="176" width="116" height="46" rx="11" fill="#e2e8f0" />
+      <rect x={cartX - 58} y={cartTopY} width="116" height={cartBottomY - cartTopY} rx="11" fill="#e2e8f0" />
       <circle cx={cartX - 32} cy="230" r="12" fill="#94a3b8" />
       <circle cx={cartX + 32} cy="230" r="12" fill="#94a3b8" />
-      <line x1={cartX} y1="176" x2={pendulumTipX} y2={pendulumTipY} stroke="#ffb703" strokeWidth="10" strokeLinecap="round" />
+      <line x1={cartX} y1={cartTopY} x2={pendulumTipX} y2={pendulumTipY} stroke="#ffb703" strokeWidth="9" strokeLinecap="round" />
+      <circle cx={cartX} cy={cartTopY} r="8" fill="#0f172a" stroke="#ffb703" strokeWidth="4" />
       <circle cx={pendulumTipX} cy={pendulumTipY} r="18" fill="#fb8500" />
     </g>
   )
 }
 
-function BallBeamScene({ frame, frames, index }) {
+function BallBeamScene({ frame, frames, framePosition }) {
   const reference = finiteNumber(frame?.reference, 0.25)
-  const position = getSmoothedFrameValue(frames, index, getBallPosition, getBallPosition(frame))
+  const position = interpolateFrameValue(frames, framePosition, getBallPosition, getBallPosition(frame))
 
   const pivotX = 560
   const pivotY = 145
@@ -147,10 +239,10 @@ function BallBeamScene({ frame, frames, index }) {
   const maxCoordinate = Math.max(1.0, reference, ...frames.map(getBallPosition).filter(Number.isFinite))
   const coordinateToPx = (value) => clamp(value / maxCoordinate, 0, 1) * (beamLength - ballRadius * 2 - 12)
 
-  // x(:,3) from the Octave model is the beam angle alpha. It is physically very small,
-  // so it is visually amplified but still clamped and smoothed to avoid artificial jumps.
-  const rawAngle = getSmoothedFrameValue(frames, index, getRawBeamAngle, getRawBeamAngle(frame))
-  const modelAngle = clamp(-rawAngle * 35, -0.16, 0.16)
+  // x(:,3) from the Octave model is the beam angle alpha in radians. Keep the
+  // animation in model scale and bound only enough to keep the beam inside the scene.
+  const rawAngle = interpolateFrameValue(frames, framePosition, getRawBeamAngle, getRawBeamAngle(frame))
+  const modelAngle = clamp(rawAngle, -0.2, 0.2)
 
   const beamDirX = -Math.cos(modelAngle)
   const beamDirY = -Math.sin(modelAngle)
@@ -162,12 +254,22 @@ function BallBeamScene({ frame, frames, index }) {
 
   const beamEndX = pivotX + beamDirX * beamLength
   const beamEndY = pivotY + beamDirY * beamLength
+  const lowerRailOffset = 12
+  const lowerBeamEndX = beamEndX - beamPerpX * lowerRailOffset
+  const lowerBeamEndY = beamEndY - beamPerpY * lowerRailOffset
+  const lowerPivotX = pivotX - beamPerpX * lowerRailOffset
+  const lowerPivotY = pivotY - beamPerpY * lowerRailOffset
 
   const ballCenterX = pivotX + beamDirX * ballDistanceFromPivot + beamPerpX * (ballRadius + 8)
   const ballCenterY = pivotY + beamDirY * ballDistanceFromPivot + beamPerpY * (ballRadius + 8)
 
   const referenceX = pivotX + beamDirX * referenceDistanceFromPivot
   const referenceY = pivotY + beamDirY * referenceDistanceFromPivot
+  const markerHalfLength = 30
+  const referenceStartX = referenceX - beamPerpX * markerHalfLength
+  const referenceStartY = referenceY - beamPerpY * markerHalfLength
+  const referenceEndX = referenceX + beamPerpX * markerHalfLength
+  const referenceEndY = referenceY + beamPerpY * markerHalfLength
 
   const gearCenterX = pivotX
   const gearCenterY = 246
@@ -185,13 +287,13 @@ function BallBeamScene({ frame, frames, index }) {
       <circle cx={pivotX} cy={pivotY} r="10" fill="#f59e0b" />
 
       <line x1={beamEndX} y1={beamEndY} x2={pivotX} y2={pivotY} stroke="#cbd5e1" strokeWidth="16" strokeLinecap="round" />
-      <line x1={beamEndX} y1={beamEndY + 10} x2={pivotX} y2={pivotY + 10} stroke="#64748b" strokeWidth="5" strokeLinecap="round" />
+      <line x1={lowerBeamEndX} y1={lowerBeamEndY} x2={lowerPivotX} y2={lowerPivotY} stroke="#64748b" strokeWidth="5" strokeLinecap="round" />
 
       <line
-        x1={referenceX}
-        y1={referenceY - 30}
-        x2={referenceX}
-        y2={referenceY + 30}
+        x1={referenceStartX}
+        y1={referenceStartY}
+        x2={referenceEndX}
+        y2={referenceEndY}
         stroke="#fb8500"
         strokeDasharray="7 7"
         strokeWidth="4"
@@ -236,36 +338,111 @@ function getRawBeamAngle(frame) {
   )
 }
 
-function getVisualBeamAngle(frame) {
-  return getRawBeamAngle(frame)
+function labelForSeries(name, languageStrings) {
+  return languageStrings.stateLabels?.[name] || name
 }
 
-function getSmoothedFrameValue(frames, index, getter, fallback = 0) {
+function buildAnimationMetrics(simulation, frame, currentTime, languageStrings) {
+  const commonMetrics = [
+    { label: languageStrings.simulationTime, value: currentTime },
+    { label: languageStrings.targetValue, value: finiteNumber(frame?.reference, NaN) },
+  ]
+
+  const stateKeys = simulation === 'inverted-pendulum'
+    ? ['cart_position', 'velocity', 'pendulum_angle', 'angular_velocity']
+    : ['ball_position', 'state_2', 'beam_angle', 'state_4']
+
+  return [
+    ...commonMetrics,
+    ...stateKeys.map((key) => ({
+      label: labelForSeries(key, languageStrings),
+      value: finiteNumber(frame?.[key], NaN),
+    })),
+  ].filter((metric) => Number.isFinite(metric.value))
+}
+
+function resolveFrameDelayMs(value) {
+  const numericValue = Number(value)
+
+  if (!Number.isFinite(numericValue) || numericValue <= 0) {
+    return SMOOTH_FRAME_DELAY_MS
+  }
+
+  return Math.max(8, numericValue)
+}
+
+function interpolateFrame(frames, position) {
+  if (!Array.isArray(frames) || frames.length === 0) {
+    return null
+  }
+
+  const lowerIndex = clamp(Math.floor(Number(position) || 0), 0, frames.length - 1)
+  const upperIndex = clamp(lowerIndex + 1, 0, frames.length - 1)
+  const ratio = clamp((Number(position) || 0) - lowerIndex, 0, 1)
+
+  return interpolateValue(frames[lowerIndex], frames[upperIndex], ratio)
+}
+
+function interpolateFrameValue(frames, position, getter, fallback = 0) {
   if (!Array.isArray(frames) || frames.length === 0) {
     return finiteNumber(fallback, 0)
   }
 
-  const currentIndex = clamp(Math.round(Number(index) || 0), 0, frames.length - 1)
-  const weights = [1, 2, 4, 2, 1]
-  const offsets = [-2, -1, 0, 1, 2]
-  let total = 0
-  let weightTotal = 0
+  const lowerIndex = clamp(Math.floor(Number(position) || 0), 0, frames.length - 1)
+  const upperIndex = clamp(lowerIndex + 1, 0, frames.length - 1)
+  const ratio = clamp((Number(position) || 0) - lowerIndex, 0, 1)
+  const lowerValue = finiteNumber(getter(frames[lowerIndex]), fallback)
+  const upperValue = finiteNumber(getter(frames[upperIndex]), lowerValue)
 
-  offsets.forEach((offset, i) => {
-    const frameIndex = clamp(currentIndex + offset, 0, frames.length - 1)
-    const value = finiteNumber(getter(frames[frameIndex]), NaN)
-
-    if (Number.isFinite(value)) {
-      total += value * weights[i]
-      weightTotal += weights[i]
-    }
-  })
-
-  return weightTotal > 0 ? total / weightTotal : finiteNumber(fallback, 0)
+  return interpolateNumber(lowerValue, upperValue, ratio)
 }
 
-function labelForSeries(name, languageStrings) {
-  return languageStrings.stateLabels?.[name] || name
+function interpolateSeriesValue(values, position, fallback = 0) {
+  if (!Array.isArray(values) || values.length === 0) {
+    return finiteNumber(fallback, 0)
+  }
+
+  const lowerIndex = clamp(Math.floor(Number(position) || 0), 0, values.length - 1)
+  const upperIndex = clamp(lowerIndex + 1, 0, values.length - 1)
+  const ratio = clamp((Number(position) || 0) - lowerIndex, 0, 1)
+  const lowerValue = finiteNumber(values[lowerIndex], fallback)
+  const upperValue = finiteNumber(values[upperIndex], lowerValue)
+
+  return interpolateNumber(lowerValue, upperValue, ratio)
+}
+
+function interpolateValue(start, end, ratio) {
+  if (Array.isArray(start) && Array.isArray(end)) {
+    return start.map((value, index) => interpolateValue(value, end[index], ratio))
+  }
+
+  if (isPlainObject(start) && isPlainObject(end)) {
+    const keys = new Set([...Object.keys(start), ...Object.keys(end)])
+    const result = {}
+
+    keys.forEach((key) => {
+      result[key] = interpolateValue(start[key], end[key], ratio)
+    })
+
+    return result
+  }
+
+  const startNumber = Number(start)
+  const endNumber = Number(end)
+
+  if (Number.isFinite(startNumber) && Number.isFinite(endNumber)) {
+    return interpolateNumber(startNumber, endNumber, ratio)
+  }
+
+  return ratio < 1 ? start : end
+}
+
+function interpolateNumber(start, end, ratio) {
+  return start + (end - start) * ratio
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
 function scaleSeriesValue(value, values, top, bottom, simulation, name = '') {
@@ -298,8 +475,4 @@ function finiteNumber(value, fallback = 0) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value))
-}
-
-function radiansToDegrees(value) {
-  return value * 180 / Math.PI
 }

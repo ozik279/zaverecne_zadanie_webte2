@@ -30,8 +30,8 @@ class OpenApiTest extends TestCase
 
         $paths = $response->json('paths');
 
-        $this->assertSame('Execute an Octave command in a client session.', $paths['/api/cas/execute']['post']['summary']);
-        $this->assertSame('Reset stored Octave command history for a client session.', $paths['/api/cas/reset']['post']['summary']);
+        $this->assertSame('Execute an Octave command in the current browser session.', $paths['/api/cas/execute']['post']['summary']);
+        $this->assertSame('Reset stored Octave command history for the current browser session.', $paths['/api/cas/reset']['post']['summary']);
         $this->assertSame('List logged CAS requests.', $paths['/api/logs']['get']['summary']);
         $this->assertSame('Export logged CAS requests to CSV.', $paths['/api/logs/export.csv']['get']['summary']);
         $this->assertSame('Run inverted pendulum simulation.', $paths['/api/simulations/inverted-pendulum']['post']['summary']);
@@ -40,6 +40,46 @@ class OpenApiTest extends TestCase
         $this->assertSame('Show usage statistics for one simulation.', $paths['/api/statistics/{simulation}']['get']['summary']);
         $this->assertSame('Return the current OpenAPI specification.', $paths['/api/openapi.json']['get']['summary']);
         $this->assertSame('Return the current OpenAPI documentation as a PDF file.', $paths['/api/openapi.pdf']['get']['summary']);
+    }
+
+    public function test_openapi_endpoint_documents_current_log_and_statistics_shapes(): void
+    {
+        $response = $this->getJson('/api/openapi.json', ['X-API-Key' => 'test-key'])
+            ->assertOk();
+        $paths = $response->json('paths');
+        $schemas = $response->json('components.schemas');
+
+        $this->assertSame(
+            ['console', 'simulation'],
+            $paths['/api/logs']['get']['parameters'][0]['schema']['enum'],
+        );
+        $this->assertSame(
+            ['console', 'simulation'],
+            $paths['/api/logs/export.csv']['get']['parameters'][0]['schema']['enum'],
+        );
+
+        $this->assertSame(
+            '#/components/schemas/SimulationStatisticsDetail',
+            $schemas['StatisticsShowResponse']['properties']['data']['$ref'],
+        );
+
+        $this->assertSame(
+            '#/components/schemas/SimulationUsageDetail',
+            $schemas['SimulationStatisticsDetail']['properties']['recentUsages']['items']['$ref'],
+        );
+        $this->assertSame(
+            '#/components/schemas/SimulationRunDetail',
+            $schemas['SimulationStatisticsDetail']['properties']['recentRuns']['items']['$ref'],
+        );
+
+        $this->assertArrayHasKey('durationMs', $schemas['SimulationRunDetail']['properties']);
+        $this->assertArrayHasKey('city', $schemas['SimulationUsageDetail']['properties']);
+        $this->assertArrayHasKey('initialBallVelocity', $schemas['BallBeamRequest']['properties']);
+        $this->assertArrayHasKey('initialAngularVelocity', $schemas['InvertedPendulumRequest']['properties']);
+        $this->assertSame(-0.2, $schemas['BallBeamRequest']['properties']['initialBeamAngle']['minimum']);
+        $this->assertSame(0.2, $schemas['BallBeamRequest']['properties']['initialBeamAngle']['maximum']);
+        $this->assertSame(-0.2, $schemas['InvertedPendulumRequest']['properties']['initialAngle']['minimum']);
+        $this->assertSame(0.2, $schemas['InvertedPendulumRequest']['properties']['initialAngle']['maximum']);
     }
 
     public function test_openapi_pdf_endpoint_requires_api_key(): void

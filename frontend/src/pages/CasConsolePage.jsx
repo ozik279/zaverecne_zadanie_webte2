@@ -1,11 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { requestJson } from '../api'
-import { getOrCreateClientToken } from '../token'
 import { translations } from '../i18n'
 
 export default function CasConsolePage({ language }) {
   const t = translations[language]
-  const clientToken = useMemo(() => getOrCreateClientToken(), [])
   const [command, setCommand] = useState('a=1+1\na+2')
   const [output, setOutput] = useState('')
   const [error, setError] = useState('')
@@ -20,7 +18,7 @@ export default function CasConsolePage({ language }) {
     try {
       const data = await requestJson('/cas/execute', {
         method: 'POST',
-        body: JSON.stringify({ clientToken, command }),
+        body: JSON.stringify({ command }),
       })
 
       setOutput([data.stdout, data.stderr].filter(Boolean).join('\n') || JSON.stringify(data, null, 2))
@@ -38,7 +36,6 @@ export default function CasConsolePage({ language }) {
     try {
       await requestJson('/cas/reset', {
         method: 'POST',
-        body: JSON.stringify({ clientToken }),
       })
       setOutput(t.casSessionReset)
     } catch (requestError) {
@@ -49,28 +46,21 @@ export default function CasConsolePage({ language }) {
   }
 
   return (
-    <main className="page">
-      <section className="hero compact">
+    <main className="page tool-page">
+      <section className="hero compact tool-hero">
         <div>
           <p className="eyebrow">{t.casConsole}</p>
           <h1>{t.casConsoleTitle}</h1>
-          <p className="hero-copy">{t.casConsoleHelp}</p>
-        </div>
-        <div className="hero-chip">
-          <span>{t.currentToken}:</span>
-          <strong>{clientToken}</strong>
         </div>
       </section>
 
       <section className="panel-grid console-grid">
-        <form className="card form-card" onSubmit={execute}>
+        <form className="card form-card tool-card" onSubmit={execute}>
           <div className="section-head">
             <h2>{t.casCommand}</h2>
-            <p>{t.casCommandHint}</p>
           </div>
 
           <label className="field syntax-field">
-            <span>{t.casTextarea}</span>
             <div className="syntax-editor">
               <pre aria-hidden="true" dangerouslySetInnerHTML={{ __html: highlighted }} />
               <textarea
@@ -93,10 +83,9 @@ export default function CasConsolePage({ language }) {
           {error ? <div className="alert error">{t.error}: {error}</div> : null}
         </form>
 
-        <div className="card result-card">
+        <div className="card result-card tool-card">
           <div className="section-head">
             <h2>{t.casOutput}</h2>
-            <p>{t.casOutputHint}</p>
           </div>
           <pre className="json-block console-output">{output || t.noData}</pre>
         </div>

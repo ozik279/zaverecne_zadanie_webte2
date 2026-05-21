@@ -119,7 +119,9 @@ class OctaveSimulationRunner
     {
         $reference = $this->floatValue($parameters['reference'] ?? 0.2);
         $initialPosition = $this->floatValue($parameters['initialPosition'] ?? 0.0);
+        $initialVelocity = $this->floatValue($parameters['initialVelocity'] ?? 0.0);
         $initialAngle = $this->floatValue($parameters['initialAngle'] ?? 0.0);
+        $initialAngularVelocity = $this->floatValue($parameters['initialAngularVelocity'] ?? 0.0);
         $duration = $this->floatValue($parameters['duration'] ?? 10.0);
         $step = $this->floatValue($parameters['step'] ?? 0.05);
         $baseScript = $this->loadModelScript('kyvadlo.txt');
@@ -133,8 +135,10 @@ pkg load control;
     t = 0:$step:$duration;
     r = $reference;
     initPozicia = $initialPosition;
+    initRychlost = $initialVelocity;
     initUhol = $initialAngle;
-    [y,t,x] = lsim(sys,r*ones(size(t)),t,[initPozicia;0;initUhol;0]);
+    initUhlovaRychlost = $initialAngularVelocity;
+    [y,t,x] = lsim(sys,r*ones(size(t)),t,[initPozicia;initRychlost;initUhol;initUhlovaRychlost]);
 
 printf('__SIM_BEGIN__\\n');
 printf('TIME=%s\\n', mat2str(t, 12));
@@ -150,8 +154,10 @@ OCTAVE;
     private function buildBallBeamScript(array $parameters): string
     {
         $reference = $this->floatValue($parameters['reference'] ?? 0.25);
-        $initialPosition = $this->floatValue($parameters['initialPosition'] ?? ($parameters['initialSpeed'] ?? 0.0));
-        $initialAngle = $this->floatValue($parameters['initialAngle'] ?? ($parameters['initialAcceleration'] ?? 0.0));
+        $initialBallPosition = $this->floatValue($parameters['initialBallPosition'] ?? ($parameters['initialSpeed'] ?? ($parameters['initialPosition'] ?? 0.0)));
+        $initialBallVelocity = $this->floatValue($parameters['initialBallVelocity'] ?? ($parameters['initialVelocity'] ?? 0.0));
+        $initialBeamAngle = $this->floatValue($parameters['initialBeamAngle'] ?? ($parameters['initialAcceleration'] ?? ($parameters['initialAngle'] ?? 0.0)));
+        $initialBeamAngularVelocity = $this->floatValue($parameters['initialBeamAngularVelocity'] ?? ($parameters['initialAngularVelocity'] ?? 0.0));
         $duration = $this->floatValue($parameters['duration'] ?? 5.0);
         $step = $this->floatValue($parameters['step'] ?? 0.01);
         $baseScript = $this->loadModelScript('gulicka.txt');
@@ -164,9 +170,15 @@ OCTAVE;
 
 t = 0:$step:$duration;
 r = $reference;
-initPoloha = $initialPosition;
-initUhol = $initialAngle;
-[y,t,x] = lsim(N*sys,r*ones(size(t)),t,[initPoloha;0;initUhol;0]);
+initRychlost = $initialBallPosition;
+initRychlostGulicky = $initialBallVelocity;
+initZrychlenie = $initialBeamAngle;
+initUhlovaRychlostTyce = $initialBeamAngularVelocity;
+
+% Keep the precompensator N on the input matrix so x(:,1) remains the same
+% physical ball-position coordinate as y(:,1) when initial states are non-zero.
+sysPhysical = ss(A-B*K,B*N,C,D);
+[y,t,x] = lsim(sysPhysical,r*ones(size(t)),t,[initRychlost;initRychlostGulicky;initZrychlenie;initUhlovaRychlostTyce]);
 
 printf('__SIM_BEGIN__\\n');
 printf('TIME=%s\\n', mat2str(t, 12));

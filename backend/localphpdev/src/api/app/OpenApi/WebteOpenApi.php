@@ -37,9 +37,8 @@ use OpenApi\Attributes as OA;
             new OA\Schema(
                 schema: 'CasExecuteRequest',
                 type: 'object',
-                required: ['clientToken', 'command'],
+                required: ['command'],
                 properties: [
-                    new OA\Property(property: 'clientToken', type: 'string', maxLength: 128),
                     new OA\Property(property: 'command', type: 'string', maxLength: 10000, example: 'a=1+1'),
                 ],
             ),
@@ -58,10 +57,7 @@ use OpenApi\Attributes as OA;
             new OA\Schema(
                 schema: 'CasResetRequest',
                 type: 'object',
-                required: ['clientToken'],
-                properties: [
-                    new OA\Property(property: 'clientToken', type: 'string', maxLength: 128),
-                ],
+                properties: [],
             ),
             new OA\Schema(
                 schema: 'CasResetResponse',
@@ -83,9 +79,7 @@ use OpenApi\Attributes as OA;
                 schema: 'CasLog',
                 type: 'object',
                 properties: [
-                    new OA\Property(property: 'id', type: 'integer'),
                     new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', nullable: true),
-                    new OA\Property(property: 'clientToken', type: 'string', nullable: true),
                     new OA\Property(property: 'source', type: 'string'),
                     new OA\Property(property: 'command', type: 'string'),
                     new OA\Property(property: 'successful', type: 'boolean'),
@@ -112,13 +106,14 @@ use OpenApi\Attributes as OA;
                 type: 'object',
                 required: ['reference'],
                 properties: [
-                    new OA\Property(property: 'clientToken', type: 'string', nullable: true),
-                    new OA\Property(property: 'reference', type: 'number', example: 0.2),
-                    new OA\Property(property: 'initialPosition', type: 'number', nullable: true),
-                    new OA\Property(property: 'initialAngle', type: 'number', nullable: true),
-                    new OA\Property(property: 'duration', type: 'number', nullable: true),
-                    new OA\Property(property: 'step', type: 'number', nullable: true),
-                    new OA\Property(property: 'slowdownMs', type: 'integer', nullable: true),
+                    new OA\Property(property: 'reference', description: 'Target cart position r.', type: 'number', minimum: -0.5, maximum: 0.5, example: 0.2),
+                    new OA\Property(property: 'initialPosition', description: 'Initial cart position initPozicia.', type: 'number', minimum: -0.5, maximum: 0.5, nullable: true),
+                    new OA\Property(property: 'initialVelocity', description: 'Initial cart velocity, second state of the lsim initial vector.', type: 'number', minimum: -0.5, maximum: 0.5, nullable: true),
+                    new OA\Property(property: 'initialAngle', description: 'Initial pendulum angle initUhol.', type: 'number', minimum: -0.2, maximum: 0.2, nullable: true),
+                    new OA\Property(property: 'initialAngularVelocity', description: 'Initial pendulum angular velocity, fourth state of the lsim initial vector.', type: 'number', minimum: -1, maximum: 1, nullable: true),
+                    new OA\Property(property: 'duration', description: 'Simulation duration in seconds.', type: 'number', minimum: 0.5, maximum: 10, nullable: true),
+                    new OA\Property(property: 'step', description: 'Calculation time step in seconds.', type: 'number', minimum: 0.01, maximum: 0.1, nullable: true),
+                    new OA\Property(property: 'slowdownMs', description: 'Animation slowdown in milliseconds per frame. Zero uses smooth default playback.', type: 'integer', minimum: 0, maximum: 5000, nullable: true),
                 ],
             ),
             new OA\Schema(
@@ -126,13 +121,14 @@ use OpenApi\Attributes as OA;
                 type: 'object',
                 required: ['reference'],
                 properties: [
-                    new OA\Property(property: 'clientToken', type: 'string', nullable: true),
-                    new OA\Property(property: 'reference', type: 'number', example: 0.25),
-                    new OA\Property(property: 'initialPosition', type: 'number', nullable: true),
-                    new OA\Property(property: 'initialAngle', type: 'number', nullable: true),
-                    new OA\Property(property: 'duration', type: 'number', nullable: true),
-                    new OA\Property(property: 'step', type: 'number', nullable: true),
-                    new OA\Property(property: 'slowdownMs', type: 'integer', nullable: true),
+                    new OA\Property(property: 'reference', description: 'Target ball position r.', type: 'number', minimum: 0, maximum: 0.5, example: 0.25),
+                    new OA\Property(property: 'initialBallPosition', description: 'Initial ball position, first state of the lsim initial vector. This replaces the initRychlost demo value from gulicka.txt.', type: 'number', minimum: 0, maximum: 0.5, nullable: true),
+                    new OA\Property(property: 'initialBallVelocity', description: 'Initial ball velocity, second state of the lsim initial vector.', type: 'number', minimum: -0.1, maximum: 0.5, nullable: true),
+                    new OA\Property(property: 'initialBeamAngle', description: 'Initial beam angle, third state of the lsim initial vector. This replaces the initZrychlenie demo value from gulicka.txt.', type: 'number', minimum: -0.2, maximum: 0.2, nullable: true),
+                    new OA\Property(property: 'initialBeamAngularVelocity', description: 'Initial beam angular velocity, fourth state of the lsim initial vector.', type: 'number', minimum: -2, maximum: 2, nullable: true),
+                    new OA\Property(property: 'duration', description: 'Simulation duration in seconds.', type: 'number', minimum: 0.1, maximum: 5, nullable: true),
+                    new OA\Property(property: 'step', description: 'Calculation time step in seconds.', type: 'number', minimum: 0.005, maximum: 0.05, nullable: true),
+                    new OA\Property(property: 'slowdownMs', description: 'Animation slowdown in milliseconds per frame. Zero uses smooth default playback.', type: 'integer', minimum: 0, maximum: 5000, nullable: true),
                 ],
             ),
             new OA\Schema(
@@ -169,7 +165,7 @@ use OpenApi\Attributes as OA;
                 schema: 'StatisticsShowResponse',
                 type: 'object',
                 properties: [
-                    new OA\Property(property: 'data', ref: '#/components/schemas/SimulationStatistics'),
+                    new OA\Property(property: 'data', ref: '#/components/schemas/SimulationStatisticsDetail'),
                 ],
             ),
             new OA\Schema(
@@ -182,6 +178,48 @@ use OpenApi\Attributes as OA;
                     new OA\Property(property: 'usages', type: 'integer'),
                     new OA\Property(property: 'lastRunAt', type: 'string', format: 'date-time', nullable: true),
                     new OA\Property(property: 'lastUsageAt', type: 'string', format: 'date-time', nullable: true),
+                ],
+            ),
+            new OA\Schema(
+                schema: 'SimulationStatisticsDetail',
+                type: 'object',
+                properties: [
+                    new OA\Property(property: 'simulation', type: 'string'),
+                    new OA\Property(property: 'runs', type: 'integer'),
+                    new OA\Property(property: 'successfulRuns', type: 'integer'),
+                    new OA\Property(property: 'usages', type: 'integer'),
+                    new OA\Property(property: 'lastRunAt', type: 'string', format: 'date-time', nullable: true),
+                    new OA\Property(property: 'lastUsageAt', type: 'string', format: 'date-time', nullable: true),
+                    new OA\Property(
+                        property: 'recentUsages',
+                        type: 'array',
+                        items: new OA\Items(ref: '#/components/schemas/SimulationUsageDetail'),
+                    ),
+                    new OA\Property(
+                        property: 'recentRuns',
+                        type: 'array',
+                        items: new OA\Items(ref: '#/components/schemas/SimulationRunDetail'),
+                    ),
+                ],
+            ),
+            new OA\Schema(
+                schema: 'SimulationUsageDetail',
+                type: 'object',
+                properties: [
+                    new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', nullable: true),
+                    new OA\Property(property: 'city', type: 'string'),
+                    new OA\Property(property: 'country', type: 'string'),
+                ],
+            ),
+            new OA\Schema(
+                schema: 'SimulationRunDetail',
+                type: 'object',
+                properties: [
+                    new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', nullable: true),
+                    new OA\Property(property: 'successful', type: 'boolean'),
+                    new OA\Property(property: 'durationMs', type: 'integer', nullable: true),
+                    new OA\Property(property: 'city', type: 'string'),
+                    new OA\Property(property: 'country', type: 'string'),
                 ],
             ),
             new OA\Schema(
@@ -198,7 +236,7 @@ use OpenApi\Attributes as OA;
 #[OA\Post(
     path: '/api/cas/execute',
     tags: ['CAS Console'],
-    summary: 'Execute an Octave command in a client session.',
+    summary: 'Execute an Octave command in the current browser session.',
     requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/CasExecuteRequest')),
     responses: [
         new OA\Response(response: 200, description: 'Successful CAS command result.', content: new OA\JsonContent(ref: '#/components/schemas/CasExecuteResponse')),
@@ -209,8 +247,8 @@ use OpenApi\Attributes as OA;
 #[OA\Post(
     path: '/api/cas/reset',
     tags: ['CAS Console'],
-    summary: 'Reset stored Octave command history for a client session.',
-    requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/CasResetRequest')),
+    summary: 'Reset stored Octave command history for the current browser session.',
+    requestBody: new OA\RequestBody(required: false, content: new OA\JsonContent(ref: '#/components/schemas/CasResetRequest')),
     responses: [
         new OA\Response(response: 200, description: 'Session reset result.', content: new OA\JsonContent(ref: '#/components/schemas/CasResetResponse')),
         new OA\Response(response: 401, description: 'Missing or invalid API key.', content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
@@ -222,9 +260,8 @@ use OpenApi\Attributes as OA;
     tags: ['CAS Logs'],
     summary: 'List logged CAS requests.',
     parameters: [
-        new OA\Parameter(name: 'source', in: 'query', description: 'Filter by source, for example console.', schema: new OA\Schema(type: 'string')),
+        new OA\Parameter(name: 'source', in: 'query', description: 'Filter by source.', schema: new OA\Schema(type: 'string', enum: ['console', 'simulation'])),
         new OA\Parameter(name: 'successful', in: 'query', description: 'Filter by true, false, 1 or 0.', schema: new OA\Schema(type: 'string')),
-        new OA\Parameter(name: 'clientToken', in: 'query', description: 'Filter by anonymous client token.', schema: new OA\Schema(type: 'string')),
         new OA\Parameter(name: 'perPage', in: 'query', description: 'Items per page, from 1 to 100.', schema: new OA\Schema(type: 'integer')),
         new OA\Parameter(name: 'page', in: 'query', description: 'Page number.', schema: new OA\Schema(type: 'integer')),
     ],
@@ -239,9 +276,8 @@ use OpenApi\Attributes as OA;
     tags: ['CAS Logs'],
     summary: 'Export logged CAS requests to CSV.',
     parameters: [
-        new OA\Parameter(name: 'source', in: 'query', description: 'Filter by source, for example console.', schema: new OA\Schema(type: 'string')),
+        new OA\Parameter(name: 'source', in: 'query', description: 'Filter by source.', schema: new OA\Schema(type: 'string', enum: ['console', 'simulation'])),
         new OA\Parameter(name: 'successful', in: 'query', description: 'Filter by true, false, 1 or 0.', schema: new OA\Schema(type: 'string')),
-        new OA\Parameter(name: 'clientToken', in: 'query', description: 'Filter by anonymous client token.', schema: new OA\Schema(type: 'string')),
     ],
     responses: [
         new OA\Response(response: 200, description: 'CSV export.', content: new OA\MediaType(mediaType: 'text/csv', schema: new OA\Schema(type: 'string', format: 'binary'))),

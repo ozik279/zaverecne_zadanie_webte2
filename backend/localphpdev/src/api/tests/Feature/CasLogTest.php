@@ -36,7 +36,9 @@ class CasLogTest extends TestCase
             ->assertJsonPath('data.0.command', 'bad command')
             ->assertJsonPath('data.0.successful', false)
             ->assertJsonPath('data.1.command', 'a=1+1')
-            ->assertJsonPath('data.1.successful', true);
+            ->assertJsonPath('data.1.successful', true)
+            ->assertJsonMissingPath('data.0.id')
+            ->assertJsonMissingPath('data.0.clientToken');
     }
 
     public function test_logs_endpoint_filters_failed_logs(): void
@@ -51,16 +53,21 @@ class CasLogTest extends TestCase
             ->assertJsonPath('data.0.successful', false);
     }
 
-    public function test_logs_endpoint_filters_by_client_token(): void
+    public function test_logs_endpoint_filters_simulation_logs(): void
     {
         $this->createLog(command: 'a=1+1', successful: true, clientToken: 'client-1');
-        $this->createLog(command: 'b=2+2', successful: true, clientToken: 'client-2');
+        $this->createLog(
+            command: 'simulation: ball-beam',
+            successful: true,
+            clientToken: 'client-2',
+            source: 'simulation',
+        );
 
-        $this->getJson('/api/logs?clientToken=client-1', ['X-API-Key' => 'test-key'])
+        $this->getJson('/api/logs?source=simulation', ['X-API-Key' => 'test-key'])
             ->assertOk()
             ->assertJsonPath('meta.total', 1)
-            ->assertJsonPath('data.0.clientToken', 'client-1')
-            ->assertJsonPath('data.0.command', 'a=1+1');
+            ->assertJsonPath('data.0.source', 'simulation')
+            ->assertJsonPath('data.0.command', 'simulation: ball-beam');
     }
 
     public function test_logs_csv_export_contains_header_and_filtered_rows(): void
@@ -75,7 +82,9 @@ class CasLogTest extends TestCase
 
         $csv = $response->streamedContent();
 
-        $this->assertStringContainsString('id,created_at,client_token,source,command,successful,execution_ms,error_message,ip_address,user_agent', $csv);
+        $this->assertStringContainsString('created_at,source,command,successful,execution_ms,error_message,ip_address,user_agent', $csv);
+        $this->assertStringNotContainsString('client_token', $csv);
+        $this->assertStringNotContainsString('client-2', $csv);
         $this->assertStringContainsString('bad command', $csv);
         $this->assertStringContainsString('parse error', $csv);
         $this->assertStringNotContainsString('a=1+1', $csv);
@@ -86,10 +95,11 @@ class CasLogTest extends TestCase
         bool $successful,
         string $clientToken,
         ?string $errorMessage = null,
+        string $source = 'console',
     ): CasRequestLog {
         return CasRequestLog::query()->create([
             'client_token' => $clientToken,
-            'source' => 'console',
+            'source' => $source,
             'command' => $command,
             'successful' => $successful,
             'stdout' => $successful ? "ok\n" : '',

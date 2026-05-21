@@ -1,15 +1,15 @@
-﻿import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { requestJson } from '../api'
-import { getOrCreateClientToken } from '../token'
 import SimulationViz from './SimulationViz'
 
-export default function SimulationPage({ title, simulation, simulationKey, endpoint, description, initialForm, languageStrings }) {
+export default function SimulationPage({ title, simulation, simulationKey, endpoint, initialForm, fieldConstraints = {}, languageStrings }) {
   const [form, setForm] = useState(initialForm)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [playing, setPlaying] = useState(true)
-  const clientToken = useMemo(() => getOrCreateClientToken(), [])
+  const [resultVersion, setResultVersion] = useState(0)
+  const [resultPlaybackDelayMs, setResultPlaybackDelayMs] = useState(Number(initialForm.slowdownMs) || 0)
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -17,17 +17,14 @@ export default function SimulationPage({ title, simulation, simulationKey, endpo
     setError('')
 
     try {
-      const payload = {
-        ...form,
-        clientToken,
-      }
-
       const data = await requestJson(endpoint, {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(form),
       })
 
       setResult(data)
+      setResultPlaybackDelayMs(Number(form.slowdownMs) || 0)
+      setResultVersion((current) => current + 1)
       setPlaying(true)
     } catch (requestError) {
       setError(requestError.message)
@@ -42,41 +39,52 @@ export default function SimulationPage({ title, simulation, simulationKey, endpo
       ...current,
       [name]: value,
     }))
+    setPlaying(false)
+  }
+
+  function resetForm() {
+    setForm(initialForm)
+    setPlaying(false)
   }
 
   return (
-    <main className="page">
-      <section className="hero compact">
+    <main className="page tool-page simulation-page">
+      <section className="hero compact tool-hero">
         <div>
           <p className="eyebrow">{title}</p>
           <h1>{simulation}</h1>
-          <p className="hero-copy">{description}</p>
-        </div>
-        <div className="hero-chip">
-          <span>{languageStrings.currentToken}:</span>
-          <strong>{clientToken}</strong>
         </div>
       </section>
 
-      <section className="panel-grid">
-        <form className="card form-card" onSubmit={handleSubmit}>
+      <section className="panel-grid simulation-grid">
+        <form className="card form-card tool-card" onSubmit={handleSubmit}>
           <div className="section-head">
             <h2>{languageStrings.requestPayload}</h2>
-            <p>{languageStrings.apiKeyHint}</p>
           </div>
 
           <div className="form-grid">
-            {Object.entries(form).map(([name, value]) => (
-              <label key={name} className="field">
-                <span>{labelFor(name, languageStrings)}</span>
-                <input
-                  type="number"
-                  step="any"
-                  value={value}
-                  onChange={(event) => updateField(name, event.target.value)}
-                />
-              </label>
-            ))}
+            {Object.entries(form).map(([name, value]) => {
+              const constraints = fieldConstraints[name] || {}
+
+              return (
+                <label key={name} className="field">
+                  <span>{labelFor(name, languageStrings, simulationKey)}</span>
+                  <input
+                    type="number"
+                    min={constraints.min}
+                    max={constraints.max}
+                    step={constraints.inputStep ?? 'any'}
+                    value={value}
+                    onChange={(event) => updateField(name, event.target.value)}
+                  />
+                  {hasRange(constraints) ? (
+                    <small className="field-range">
+                      {formatRange(constraints, languageStrings)}
+                    </small>
+                  ) : null}
+                </label>
+              )
+            })}
           </div>
 
           <div className="button-row">
@@ -86,47 +94,42 @@ export default function SimulationPage({ title, simulation, simulationKey, endpo
             <button
               className="ghost-button"
               type="button"
-              onClick={() => setForm(initialForm)}
+              onClick={resetForm}
             >
               {languageStrings.reset}
             </button>
           </div>
 
           {error ? <div className="alert error">{languageStrings.error}: {error}</div> : null}
-          {result ? (
-            <div className={`alert ${result.success ? 'success' : 'error'}`}>
-              <strong>{result.success ? languageStrings.success : languageStrings.error}</strong>
-              <span>{result.message || result.error || 'OK'}</span>
-            </div>
-          ) : null}
+          {result && !result.success ? <div className="alert error">{result.message || result.error || languageStrings.error}</div> : null}
         </form>
 
-        <div className="card result-card">
+        <div className="card result-card tool-card simulation-result-card">
           <div className="section-head">
             <h2>{languageStrings.response}</h2>
-            <p>{title}</p>
           </div>
 
           {result ? (
             <>
               <div className="stats-strip">
-                    <Stat label={languageStrings.simulationTime} value={`${result.time?.length || 0} ${languageStrings.points}`} />
-                    <Stat label={languageStrings.simulationSeries} value={`${result.series?.length || 0}`} />
-                    <Stat label={languageStrings.simulationState} value={`${result.state?.length || 0}`} />
-                    <Stat label={languageStrings.simulationFrames} value={`${result.frames?.length || 0}`} />
+                <Stat label={languageStrings.simulationTime} value={`${result.time?.length || 0} ${languageStrings.points}`} />
+                <Stat label={languageStrings.simulationSeries} value={`${result.series?.length || 0}`} />
+                <Stat label={languageStrings.simulationState} value={`${result.state?.length || 0}`} />
+                <Stat label={languageStrings.simulationFrames} value={`${result.frames?.length || 0}`} />
               </div>
 
               <SimulationViz
-                key={`${simulationKey}-${result.frames?.length}`}
+                key={`${simulationKey}-${resultVersion}`}
                 simulation={simulationKey}
                 frames={result.frames || []}
                 time={result.time || []}
                 series={result.series || []}
-                title={simulation}
                 languageStrings={languageStrings}
                 playing={playing}
-                playbackDelayMs={Number(form.slowdownMs) || 80}
+                playbackDelayMs={resultPlaybackDelayMs}
                 onTogglePlaying={() => setPlaying((current) => !current)}
+                onResetPlayback={() => setPlaying(false)}
+                onPlaybackEnd={() => setPlaying(false)}
               />
             </>
           ) : (
@@ -147,8 +150,24 @@ function Stat({ label, value }) {
   )
 }
 
-function labelFor(name, languageStrings) {
+function labelFor(name, languageStrings, simulationKey) {
+  const simulationLabels = languageStrings.fieldLabelsBySimulation?.[simulationKey]
+
+  if (simulationLabels?.[name]) {
+    return simulationLabels[name]
+  }
+
   return languageStrings.fieldLabels?.[name] || name
 }
 
+function hasRange(constraints) {
+  return constraints.min !== undefined || constraints.max !== undefined
+}
 
+function formatRange(constraints, languageStrings) {
+  const min = constraints.min ?? '-'
+  const max = constraints.max ?? '-'
+  const template = languageStrings.fieldRange || 'Range: {min} - {max}'
+
+  return template.replace('{min}', min).replace('{max}', max)
+}
